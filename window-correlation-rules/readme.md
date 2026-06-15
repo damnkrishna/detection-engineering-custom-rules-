@@ -6,7 +6,7 @@ A comprehensive repository currently containing **179 custom Windows security co
 
 ## ?? Repository Structure
 
-All rules are organized logically by their respective **MITRE ATT&CK® Tactic** folders inside the main directory:
+All rules are organized logically by their respective **MITRE ATT&CK Tactic** folders inside the main directory:
 
 `
 window-correlation-rules/
@@ -62,4 +62,4 @@ The problem.md file contains a comprehensive analysis showing:
 ---
 
 ## ?? Authors & Maintainers
-*   **Krishna Gupta** (Detection Engineer) — Original author of the core ruleset, OCSF mapping, and structural verification.
+*   **Krishna Gupta** (Detection Engineer)  Original author of the core ruleset, OCSF mapping, and structural verification.
