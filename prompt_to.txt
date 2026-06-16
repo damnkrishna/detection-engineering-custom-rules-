@@ -67,7 +67,7 @@ DEFENDER:
 - Malware detection, tamper events → product: windows_defender
 
 Every field you query MUST exist in the logsource you declare.
-- Rules cannot mix different logsources/categories. If a technique is detectable via process execution AND network connection (like VNC), you must write two separate rules labeled "Rule 1 of N" and "Rule 2 of N".
+- Rules cannot mix different logsources/categories. If a technique is detectable via multiple distinct log sources (e.g., process execution, network connection, file creation, registry modifications), you MUST write separate split rules labeled "Rule 1 of N", "Rule 2 of N", etc., in both the Custom Sigma and OCSF sections. Ensure all important log sources are covered to avoid detection gaps.
 
 STEP 5 - CONDITION LOGIC
 For each selection ask: "Can this selection fire alone on a clean enterprise machine?"
@@ -118,6 +118,10 @@ Every rule file must contain exactly three sections separated by horizontal rule
 * Coverage Check:
   * HIDS (Sysmon + Windows Defender): [Status: YES/NO/PARTIAL and explanation]
   * Windows Security Logs: [Status: YES/NO/PARTIAL and explanation]
+* Log Sources Covered:
+  - [Logsource category/service and Event ID/class, e.g. Sysmon Event ID 1 (process_creation)]
+* Log Sources Missing / Unused:
+  - [Other potential log sources and explanation of why they are unused or if they are covered in another rule part]
 * Conclusion: [Detectability statement. E.g., This technique is not detectable from Sysmon, Windows Security, or Defender logs.]
 
 ---
