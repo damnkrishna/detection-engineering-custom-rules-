@@ -1,0 +1,18 @@
+# Ignore Python scripts
+*.py
+scratch/
+.system_generated/
+
+# Ignore temporary text files
+additional_sigma_rules.txt
+extracted_sigma_rules.txt
+message.txt
+
+# Ignore HTML dashboards
+dashboard_template.html
+rules_dashboard.html
+
+# Ignore other excel files and CSVs
+enterprise-attack-v19.1.xlsx
+Copy of WIndowsSec OCSF mappings.xlsx
+ocsf_mapped_new_sprint.csv

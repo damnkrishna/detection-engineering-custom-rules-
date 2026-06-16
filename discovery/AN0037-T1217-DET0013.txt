@@ -1,0 +1,50 @@
+# Atomic Red Team – Prompt Template
+Technique: t1217
+Analytic ID: an0037
+Detection ID: det0013
+
+Description: (taken from rule title - see markdown header)
+
+Commands:
+selection_browser_paths:
+        TargetFilename|contains:
+            - '\Google\Chrome\User Data\'
+            - '\Microsoft\Edge\User Data\'
+            - '\Mozilla\Firefox\Profiles\'
+            - '\Opera Software\Opera Stable\'
+            - '\BraveSoftware\Brave-Browser\User Data\'
+    selection_browser_files:
+        TargetFilename|endswith:
+            - '\Login Data'
+            - '\Cookies'
+            - '\History'
+            - '\Bookmarks'
+            - '\Web Data'
+            - 'places.sqlite'
+            - 'key4.db'
+            - 'logins.json'
+    filter_browsers:
+        Image|endswith:
+            - '\chrome.exe'
+            - '\msedge.exe'
+            - '\firefox.exe'
+            - '\brave.exe'
+            - '\opera.exe'
+    condition: (selection_browser_paths or selection_browser_files) and not filter_browsers
+fields:
+    - Image
+    - TargetFilename
+falsepositives:
+    - Backup software copying browser profile directories, or legitimate password manager tools accessing browser databases.
+level: high
+tags:
+    - attack.discovery
+    - attack.t1217
+    - analytic.an0037
+    - detection.det0013
+
+Expected Logs:
+- (list of relevant event IDs)
+
+Verification:
+- Run the command(s) and confirm log entry appears.

@@ -1,0 +1,57 @@
+# Atomic Red Team – Prompt Template
+Technique: t1057
+Analytic ID: an0095
+Detection ID: det0034
+
+Description: (taken from rule title - see markdown header)
+
+Commands:
+selection_tasklist:
+        - Image|endswith: '\tasklist.exe'
+        - OriginalFileName: 'tasklist.exe'
+    selection_wmic:
+        - Image|endswith: '\wmic.exe'
+        - OriginalFileName: 'wmic.exe'
+    selection_wmic_args:
+        CommandLine|contains:
+            - ' process'
+    selection_powershell:
+        - Image|endswith:
+            - '\powershell.exe'
+            - '\pwsh.exe'
+        - OriginalFileName:
+            - 'PowerShell.EXE'
+            - 'pwsh.dll'
+    selection_powershell_args:
+        CommandLine|contains:
+            - 'Get-Process'
+            - 'Get-WmiObject Win32_Process'
+            - 'Get-CimInstance Win32_Process'
+    filter_installer:
+        ParentImage|endswith:
+            - '\msiexec.exe'
+            - '\setup.exe'
+    condition: (selection_tasklist or (selection_wmic and selection_wmic_args) or (selection_powershell and selection_powershell_args)) and not filter_installer
+fields:
+    - Image
+    - OriginalFileName
+    - CommandLine
+    - ParentImage
+    - ParentCommandLine
+    - CurrentDirectory
+    - User
+    - LogonId
+falsepositives:
+    - System administrators running process inventories for health checks, or monitoring tools that periodically enumerate running services.
+level: low
+tags:
+    - attack.discovery
+    - attack.t1057
+    - analytic.an0095
+    - detection.det0034
+
+Expected Logs:
+- (list of relevant event IDs)
+
+Verification:
+- Run the command(s) and confirm log entry appears.

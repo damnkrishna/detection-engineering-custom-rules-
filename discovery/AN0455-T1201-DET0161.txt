@@ -1,0 +1,59 @@
+# Atomic Red Team – Prompt Template
+Technique: t1201
+Analytic ID: an0455
+Detection ID: det0161
+
+Description: (taken from rule title - see markdown header)
+
+Commands:
+selection_net:
+        - Image|endswith: '\net.exe'
+        - OriginalFileName: 'net.exe'
+    selection_net_args:
+        CommandLine|contains: ' accounts'
+    selection_secedit:
+        - Image|endswith: '\secedit.exe'
+        - OriginalFileName: 'secedit.exe'
+    selection_secedit_args:
+        CommandLine|contains: '/export'
+    selection_powershell:
+        - Image|endswith:
+            - '\powershell.exe'
+            - '\pwsh.exe'
+        - OriginalFileName:
+            - 'PowerShell.EXE'
+            - 'pwsh.dll'
+    selection_powershell_args:
+        CommandLine|contains:
+            - 'Get-ADDefaultDomainPasswordPolicy'
+            - 'Get-ADFineGrainedPasswordPolicy'
+            - 'Get-LocalUser'
+            - 'PasswordPolicy'
+    filter_installer:
+        ParentImage|endswith:
+            - '\msiexec.exe'
+            - '\setup.exe'
+    condition: ((selection_net and selection_net_args) or (selection_secedit and selection_secedit_args) or (selection_powershell and selection_powershell_args)) and not filter_installer
+fields:
+    - Image
+    - OriginalFileName
+    - CommandLine
+    - ParentImage
+    - ParentCommandLine
+    - CurrentDirectory
+    - User
+    - LogonId
+falsepositives:
+    - Security compliance scripts or audit tools that query password policies as part of regular CIS benchmark assessments.
+level: medium
+tags:
+    - attack.discovery
+    - attack.t1201
+    - analytic.an0455
+    - detection.det0161
+
+Expected Logs:
+- (list of relevant event IDs)
+
+Verification:
+- Run the command(s) and confirm log entry appears.

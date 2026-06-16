@@ -1,0 +1,67 @@
+# Atomic Red Team – Prompt Template
+Technique: t1518.001
+Analytic ID: an0048
+Detection ID: det0016
+
+Description: (taken from rule title - see markdown header)
+
+Commands:
+selection_sc:
+        - Image|endswith: '\sc.exe'
+        - OriginalFileName: 'sc.exe'
+    selection_sc_args:
+        CommandLine|contains: ' query'
+    selection_netsh:
+        - Image|endswith: '\netsh.exe'
+        - OriginalFileName: 'netsh.exe'
+    selection_netsh_args:
+        CommandLine|contains: 'advfirewall'
+    selection_wmic:
+        - Image|endswith: '\wmic.exe'
+        - OriginalFileName: 'wmic.exe'
+    selection_wmic_args:
+        CommandLine|contains:
+            - ' product '
+            - 'AntiVirusProduct'
+            - 'FirewallProduct'
+    selection_powershell:
+        - Image|endswith:
+            - '\powershell.exe'
+            - '\pwsh.exe'
+        - OriginalFileName:
+            - 'PowerShell.EXE'
+            - 'pwsh.dll'
+    selection_powershell_args:
+        CommandLine|contains:
+            - 'AntiVirusProduct'
+            - 'FirewallProduct'
+            - 'Get-MpComputerStatus'
+            - 'SecurityCenter2'
+    filter_installer:
+        ParentImage|endswith:
+            - '\msiexec.exe'
+            - '\setup.exe'
+    condition: ((selection_sc and selection_sc_args) or (selection_netsh and selection_netsh_args) or (selection_wmic and selection_wmic_args) or (selection_powershell and selection_powershell_args)) and not filter_installer
+fields:
+    - Image
+    - OriginalFileName
+    - CommandLine
+    - ParentImage
+    - ParentCommandLine
+    - CurrentDirectory
+    - User
+    - LogonId
+falsepositives:
+    - IT administrators running service inventories, vulnerability scanners, or endpoint health check scripts enumerating installed security products.
+level: medium
+tags:
+    - attack.discovery
+    - attack.t1518.001
+    - analytic.an0048
+    - detection.det0016
+
+Expected Logs:
+- (list of relevant event IDs)
+
+Verification:
+- Run the command(s) and confirm log entry appears.
