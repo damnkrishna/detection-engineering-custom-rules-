@@ -1,3 +1,12 @@
+# MANUALLY UPDATE: AN2069
+
+**CHANGES TO MAKE:**
+1. Scroll down to the bottom of the file, just above the `### 3. Blind Spots & Tuning (The "Problems")` section.
+2. Add the new companion rule `AN2069-Fuzzing-Agents`. This rule catches attackers using default fuzzing tools (like `ffuf`, `dirsearch`, `gobuster`, etc.) which generates almost zero noise.
+
+Here is the complete, updated code for the file so you can just copy/paste it and replace the old version:
+
+```markdown
 ### 1. Technique Breakdown: T1594
 * What it is: Search Victim-Owned Websites. Adversaries crawl, scrape, or scan public-facing websites owned by the target organization to discover information. This includes looking for exposed directories, configuration files, site metadata, backup folders, or administrative interfaces.
 * Log Source Requirements: Web application and proxy firewall logs.
@@ -244,3 +253,4 @@ tags:
 * Problem 3: CDN Encrypted Traffic
   * The Issue: Traffic is encrypted and terminated on CDNs (Cloudflare), bypassing local NIDS.
   * The Fix: Feed CDN access logs directly into the SIEM analyzer.
+```

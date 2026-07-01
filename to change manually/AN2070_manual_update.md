@@ -1,3 +1,12 @@
+# MANUALLY UPDATE: AN2070
+
+**CHANGES TO MAKE:**
+1. Scroll down to line ~46 inside the main Sigma rule (under `filter_legitimate`).
+2. Delete the line `- 'nmap'` from the `user_agent|contains` block. This ensures attackers can't bypass your scanner detection just by using the nmap User-Agent.
+
+Here is the complete, updated code for the file so you can just copy/paste it and replace the old version:
+
+```markdown
 ### 1. Technique Breakdown: T1595
 * What it is: Active Scanning. Adversaries scan the target organization's public networks to detect open ports, active services, vulnerabilities, and system details. This is an active probe that directly touches the boundary interfaces.
 * Log Source Requirements: Firewall and Network IDS logs capturing connection metrics.
@@ -173,3 +182,4 @@ tags:
 * Problem 3: Common Cloud Probes
   * The Issue: Internet scanners continuously scan the IP ranges causing high alert volume.
   * The Fix: Ignore scanning from known threat feeds (e.g. Censys, Shodan, Shadowserver) if they are not targeting sensitive systems.
+```

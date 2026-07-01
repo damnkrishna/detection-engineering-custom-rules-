@@ -6192,7 +6192,6 @@ detection:
         or user_agent|contains:
             - 'Shodan'
             - 'Censys'
-            - 'nmap'
     
     filter_internal:
         orig_h|cidr: '10.0.0.0/8'  # Internal scans OK
