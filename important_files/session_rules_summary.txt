@@ -1,0 +1,79 @@
+==========================================================================================
+  SESSION RULES SUMMARY — ALL NEW DETECTION RULES WRITTEN
+  Generated : 2026-07-01
+  Total     : 41 rules  (AN2067 – AN2107)
+==========================================================================================
+
+──────────────────────────────────────────────────────────────────────────────────────────
+  RECONNAISSANCE SPRINT
+──────────────────────────────────────────────────────────────────────────────────────────
+  #    Analytic   DET ID     Tech     Tactic               Lvl      Rule Title
+  ──── ────────── ────────── ──────── ──────────────────── ──────── ────────────────────────────────────────
+  1    AN2067     DET0924    T1592    Reconnaissance       medium   Suspicious System Information Gathering
+  2    AN2068     DET0925    T1593    Reconnaissance       low      OSINT-ONLY (NO SIGMA BY DESIGN)
+  3    AN2069     DET0926    T1594    Reconnaissance       high     Rapid Web Path Discovery from Single Source
+  4    AN2070     DET0927    T1595    Reconnaissance       high     External Port Scanning Detection
+  5    AN2071     DET0928    T1596    Reconnaissance       low      OSINT-ONLY (NO SIGMA BY DESIGN)
+  6    AN2072     DET0929    T1597    Reconnaissance       low      OSINT-ONLY (NO SIGMA BY DESIGN)
+  7    AN2073     DET0930    T1598    Reconnaissance       high     Phishing for Information
+  8    AN2074     DET0931    T1681    Reconnaissance       low      OSINT-ONLY (NO SIGMA BY DESIGN)
+  9    AN2075     DET0932    T1682    Reconnaissance       medium   Outbound Data Upload to Public GenAI Services
+
+  Subtotal: 9 rules
+
+──────────────────────────────────────────────────────────────────────────────────────────
+  DISCOVERY SPRINT 1 (AN2076-AN2086)
+──────────────────────────────────────────────────────────────────────────────────────────
+  #    Analytic   DET ID     Tech     Tactic               Lvl      Rule Title
+  ──── ────────── ────────── ──────── ──────────────────── ──────── ────────────────────────────────────────
+  1    AN2076     DET0933    T1007    Discovery            medium   System Service Enumeration
+  2    AN2077     DET0934    T1012    Discovery            medium   Registry Query for Sensitive Configurations
+  3    AN2078     DET0935    T1016    Discovery            low      System Network Configuration Enumeration
+  4    AN2079     DET0936    T1018    Discovery            medium   Remote System Discovery via Native Tools
+  5    AN2080     DET0937    T1046    Discovery            low      Local Network Service Port Discovery
+  6    AN2081     DET0938    T1049    Discovery            low      SMB Share and Session Discovery
+  7    AN2082     DET0939    T1069    Discovery            medium   Local and Domain Group Discovery
+  8    AN2083     DET0940    T1082    Discovery            low      System and Hardware Information Enumeration
+  9    AN2084     DET0941    T1083    Discovery            low      Recursive Directory Enumeration
+  10   AN2085     DET0942    T1087    Discovery            medium   Local and Domain Account Enumeration
+  11   AN2086     DET0943    T1120    Discovery            low      Peripheral Device Discovery via PowerShell or WMI
+
+  Subtotal: 11 rules
+
+──────────────────────────────────────────────────────────────────────────────────────────
+  DISCOVERY SPRINT 2 (AN2087-AN2097)
+──────────────────────────────────────────────────────────────────────────────────────────
+  #    Analytic   DET ID     Tech     Tactic               Lvl      Rule Title
+  ──── ────────── ────────── ──────── ──────────────────── ──────── ────────────────────────────────────────
+  1    AN2087     DET0944    T1135    Discovery            medium   Network Share Enumeration via Native Tools
+  2    AN2088     DET0945    T1614    Discovery            low      System Locale and Keyboard Layout Discovery
+  3    AN2089     DET0946    T1124    Discovery            low      System Time and Timezone Discovery
+  4    AN2090     DET0947    T1615    Discovery            medium   Group Policy Enumeration
+  5    AN2091     DET0948    T1654    Discovery            medium   Windows Event Log Enumeration
+  6    AN2092     DET0949    T1652    Discovery            medium   Device Driver Enumeration
+  7    AN2093     DET0950    T1040    Discovery            high     Network Packet Capture Tool Execution
+  8    AN2094     DET0951    T1497    Discovery            high     VM and Sandbox Detection Artifact Queries
+  9    AN2095     DET0952    T1673    Discovery            medium   Virtual Machine Infrastructure Enumeration
+  10   AN2096     DET0953    T1680    Discovery            low      Local Storage Device Enumeration
+  11   AN2097     DET0954    T1622    Discovery            medium   Debugger Presence Check via Registry or Process Query
+
+  Subtotal: 11 rules
+
+──────────────────────────────────────────────────────────────────────────────────────────
+  SPRINT 3 — MIXED TACTICS (AN2098-AN2107)
+──────────────────────────────────────────────────────────────────────────────────────────
+  #    Analytic   DET ID     Tech     Tactic               Lvl      Rule Title
+  ──── ────────── ────────── ──────── ──────────────────── ──────── ────────────────────────────────────────
+  1    AN2098     DET0955    T1197    Stealth              medium   BITS Job Transfer or Notification Command Abuse
+  2    AN2099     DET0956    T1140    Stealth              medium   File Decode or Deobfuscation via LOLBins
+  3    AN2100     DET0957    T1202    Stealth              medium   Indirect Command Execution via Trusted Windows Utilities
+  4    AN2101     DET0958    T1216    Stealth              high     Microsoft-Signed Script Proxy Execution
+  5    AN2102     DET0959    T1220    Stealth              high     XSL Script Execution via WMIC or MSXSL
+  6    AN2103     DET0960    T1552    Credential Access    high     Credential String Search in Files and Registry
+  7    AN2104     DET0961    T1187    Credential Access    high     Forced Authentication via UNC Path or SCF File Creation
+  8    AN2105     DET0962    T1036    Stealth              critical System Binary Name Used from Non-Standard Path
+  9    AN2106     DET0963    T1027    Stealth              high     PowerShell Encoded Command or Heavy Obfuscation Execution
+  10   AN2107     DET0964    T1539    Credential Access    high     Browser Cookie Database Access by Non-Browser Process
+
+  Subtotal: 10 rules
+

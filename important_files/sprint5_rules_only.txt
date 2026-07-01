@@ -1,0 +1,482 @@
+---
+title: Microsoft Office Application Spawning Script Interpreter (AN2119)
+id: f1a2b3c4-e5f6-7a8b-9c0d-1e2f3a4b5c80
+status: experimental
+description: "Detects command-line script interpreters or shell utilities (cmd.exe, powershell.exe, mshta.exe, wscript.exe, cscript.exe) running as child processes of Microsoft Office applications (Word, Excel, PowerPoint), which is a common indicator of remote template injection or macro-based execution."
+author: Krishna Gupta
+date: 2026-07-01
+logsource:
+    category: process_creation
+    product: windows
+detection:
+    selection_parent:
+        ParentImage|endswith:
+            - '\winword.exe'
+            - '\excel.exe'
+            - '\powerpnt.exe'
+            - '\outlook.exe'
+    selection_child_images:
+        Image|endswith:
+            - '\cmd.exe'
+            - '\powershell.exe'
+            - '\pwsh.exe'
+            - '\wscript.exe'
+            - '\cscript.exe'
+            - '\mshta.exe'
+            - '\rundll32.exe'
+            - '\regsvr32.exe'
+    selection_child_ofn:
+        OriginalFileName:
+            - 'Cmd.Exe'
+            - 'PowerShell.EXE'
+            - 'pwsh.exe'
+            - 'wscript.exe'
+            - 'cscript.exe'
+            - 'mshta.exe'
+            - 'rundll32.exe'
+            - 'regsvr32.exe'
+    filter_legitimate_child:
+        Image|endswith: '\rundll32.exe'
+        CommandLine|contains: 'shell32.dll'
+    condition: selection_parent and (selection_child_images or selection_child_ofn) and not filter_legitimate_child
+fields:
+    - ParentImage
+    - Image
+    - CommandLine
+    - User
+falsepositives:
+    - Legitimate enterprise add-ins or custom office extensions that launch scripting interpreters to generate reports or integrate with database backends.
+level: high
+tags:
+    - attack.defense_evasion
+    - attack.t1221
+    - analytic.an2119
+    - detection.det0976
+---
+title: Execution Guardrails Target Discovery Query (AN2120)
+id: f1a2b3c4-e5f6-7a8b-9c0d-1e2f3a4b5c81
+status: experimental
+description: "Detects the execution of discovery tools (such as systeminfo, whoami, gpresult, or net.exe querying domain membership) used by payloads to evaluate target environment conditions before executing subsequent payload execution phases."
+author: Krishna Gupta
+date: 2026-07-01
+logsource:
+    category: process_creation
+    product: windows
+detection:
+    selection_images:
+        Image|endswith:
+            - '\systeminfo.exe'
+            - '\whoami.exe'
+            - '\gpresult.exe'
+            - '\quser.exe'
+    selection_ofn:
+        OriginalFileName:
+            - 'systeminfo.exe'
+            - 'whoami.exe'
+            - 'gpresult.exe'
+            - 'quser.exe'
+    selection_cli:
+        CommandLine|contains:
+            - ' /domain'
+            - ' /fqdn'
+            - 'user /domain'
+    filter_installer:
+        ParentImage|endswith:
+            - '\msiexec.exe'
+            - '\setup.exe'
+    condition: (selection_images or selection_ofn) and selection_cli and not filter_installer
+fields:
+    - Image
+    - OriginalFileName
+    - CommandLine
+    - User
+falsepositives:
+    - Administrative scripts collecting system inventory details or checking Active Directory configurations.
+level: medium
+tags:
+    - attack.defense_evasion
+    - attack.t1480
+    - analytic.an2120
+    - detection.det0977
+---
+title: System Firmware or BIOS Flash Utility Execution (AN2121)
+id: f1a2b3c4-e5f6-7a8b-9c0d-1e2f3a4b5c82
+status: experimental
+description: "Detects the execution of known bios flash utilities, motherboard firmware tools (e.g. flashrom, HpBiosUpdate, WinFlash, ASUS WinFlash), or command lines modifying UEFI settings, indicating potential pre-OS boot persistent modification."
+author: Krishna Gupta
+date: 2026-07-01
+logsource:
+    category: process_creation
+    product: windows
+detection:
+    selection_images:
+        Image|endswith:
+            - '\flashrom.exe'
+            - '\winflash.exe'
+            - '\HpBiosUpdate.exe'
+            - '\fwupd.exe'
+    selection_ofn:
+        OriginalFileName:
+            - 'flashrom.exe'
+            - 'WinFlash.exe'
+            - 'HpBiosUpdate.exe'
+            - 'fwupd.exe'
+    selection_cli:
+        CommandLine|contains:
+            - 'bios'
+            - 'firmware'
+            - 'uefi'
+    filter_installer:
+        ParentImage|endswith:
+            - '\msiexec.exe'
+            - '\setup.exe'
+    filter_vendor:
+        ParentImage|endswith:
+            - '\HPSupportSolutionsFramework.exe'
+            - '\AsusSystemControl.exe'
+    condition: (selection_images or selection_ofn) and selection_cli and not (filter_installer or filter_vendor)
+fields:
+    - Image
+    - OriginalFileName
+    - CommandLine
+    - User
+falsepositives:
+    - IT support personnel or automated system update software executing BIOS/firmware update scripts during maintenance routines.
+level: high
+tags:
+    - attack.persistence
+    - attack.t1542
+    - analytic.an2121
+    - detection.det0978
+---
+title: PowerShell Reflective Code Loading API Call (AN2122)
+id: f1a2b3c4-e5f6-7a8b-9c0d-1e2f3a4b5c83
+status: experimental
+description: "Detects PowerShell execution invoking APIs used for reflective code loading (such as [System.Reflection.Assembly]::Load, Marshal.Copy, or GetDelegateForFunctionPointer) to execute payloads in memory without writing files to disk."
+author: Krishna Gupta
+date: 2026-07-01
+logsource:
+    product: windows
+    service: powershell
+detection:
+    selection_high_signal:
+        ScriptBlockText|contains:
+            - 'GetDelegateForFunctionPointer'
+            - 'VirtualAlloc'
+    selection_medium_signal:
+        ScriptBlockText|contains:
+            - 'System.Reflection.Assembly'
+            - 'Reflection.Assembly'
+            - '[Assembly]::Load'
+            - 'Marshal.Copy'
+    selection_obfuscation:
+        # Base64 allocations or memory streams typical of assembly loads
+        ScriptBlockText|contains|all:
+            - '[System.Convert]::FromBase64String'
+            - 'IO.MemoryStream'
+    condition: selection_high_signal or (selection_medium_signal and selection_obfuscation)
+fields:
+    - ScriptBlockText
+    - User
+    - ComputerName
+falsepositives:
+    - Specialized administrative scripts, deployment tools, or security agents that dynamically load modules in memory during startup or module import.
+level: high
+tags:
+    - attack.defense_evasion
+    - attack.t1620
+    - analytic.an2122
+    - detection.det0979
+---
+title: Authentication Certificate or Private Key Export Tool Execution (AN2123)
+id: f1a2b3c4-e5f6-7a8b-9c0d-1e2f3a4b5c84
+status: experimental
+description: "Detects the execution of known AD CS enumeration tools (e.g. Certify) or command-line parameters attempting to export authentication certificates and private keys (such as certutil.exe -exportPFX or similar commands) to steal credentials."
+author: Krishna Gupta
+date: 2026-07-01
+logsource:
+    category: process_creation
+    product: windows
+detection:
+    selection_certify:
+        Image|endswith: '\certify.exe'
+    selection_certify_ofn:
+        OriginalFileName: 'Certify.exe'
+    selection_export_images:
+        Image|endswith:
+            - '\certutil.exe'
+            - '\powershell.exe'
+            - '\pwsh.exe'
+    selection_export_ofn:
+        OriginalFileName:
+            - 'certutil.exe'
+            - 'PowerShell.EXE'
+            - 'pwsh.exe'
+    selection_export_cli:
+        CommandLine|contains:
+            - '-exportPFX'
+            - '-exportpfx'
+            - 'Export-PfxCertificate'
+    filter_installer:
+        ParentImage|endswith:
+            - '\msiexec.exe'
+            - '\setup.exe'
+    condition: (selection_certify or selection_certify_ofn or ((selection_export_images or selection_export_ofn) and selection_export_cli)) and not filter_installer
+fields:
+    - Image
+    - OriginalFileName
+    - CommandLine
+    - User
+falsepositives:
+    - Administrators legitimately backing up server certificates or exporting public keys for deployment.
+level: high
+tags:
+    - attack.credential-access
+    - attack.t1649
+    - analytic.an2123
+    - detection.det0980
+---
+title: Network DNS Resolver or Interface Routing Hijack (AN2124)
+id: f1a2b3c4-e5f6-7a8b-9c0d-1e2f3a4b5c85
+status: experimental
+description: "Detects the execution of commands (using netsh, PowerShell Set-DnsClientServerAddress, or host-file updates) attempting to alter system DNS servers or route maps, which is commonly used to hijack traffic or hide C2 nodes."
+author: Krishna Gupta
+date: 2026-07-01
+logsource:
+    category: process_creation
+    product: windows
+detection:
+    selection_images:
+        Image|endswith:
+            - '\netsh.exe'
+            - '\powershell.exe'
+            - '\pwsh.exe'
+    selection_ofn:
+        OriginalFileName:
+            - 'netsh.exe'
+            - 'PowerShell.EXE'
+            - 'pwsh.exe'
+    selection_cli:
+        CommandLine|re:
+            - '(?i)netsh\s+interface\s+(ip|ipv4|ipv6)\s+set\s+dns'
+        CommandLine|contains:
+            - 'Set-DnsClientServerAddress'
+            - 'drivers\etc\hosts'
+    filter_installer:
+        ParentImage|endswith:
+            - '\msiexec.exe'
+            - '\setup.exe'
+    filter_vpn:
+        ParentImage|endswith:
+            - '\vpnagent.exe'
+            - '\pangps.exe'
+    condition: (selection_images or selection_ofn) and selection_cli and not (filter_installer or filter_vpn)
+fields:
+    - Image
+    - OriginalFileName
+    - CommandLine
+    - User
+falsepositives:
+    - Network diagnostic tools, VPN client setup agents, or system administrators configuring network adapters during system setup.
+level: high
+tags:
+    - attack.defense_evasion
+    - attack.t1665
+    - analytic.an2124
+    - detection.det0981
+---
+title: Input Keystroke Automation or Injection Tool Execution (AN2125)
+id: f1a2b3c4-e5f6-7a8b-9c0d-1e2f3a4b5c86
+status: experimental
+description: "Detects the execution of input injection/automation engines (such as AutoIt3, AutoHotkey) or command line calls executing SendKeys routines to automate keystrokes or UI interactions to bypass warning boxes."
+author: Krishna Gupta
+date: 2026-07-01
+logsource:
+    category: process_creation
+    product: windows
+detection:
+    selection_autoit_images:
+        Image|endswith:
+            - '\autoit3.exe'
+            - '\autohotkey.exe'
+    selection_autoit_ofn:
+        OriginalFileName:
+            - 'AutoIt3.exe'
+            - 'AutoHotkey.exe'
+    selection_ps:
+        Image|endswith:
+            - '\powershell.exe'
+            - '\pwsh.exe'
+    selection_ps_ofn:
+        OriginalFileName:
+            - 'PowerShell.EXE'
+            - 'pwsh.exe'
+    selection_ps_cli:
+        CommandLine|contains:
+            - 'SendKeys'
+            - 'SendInput'
+    filter_installer:
+        ParentImage|endswith:
+            - '\msiexec.exe'
+            - '\setup.exe'
+    condition: (selection_autoit_images or selection_autoit_ofn or ((selection_ps or selection_ps_ofn) and selection_ps_cli)) and not filter_installer
+fields:
+    - Image
+    - OriginalFileName
+    - CommandLine
+    - User
+falsepositives:
+    - Legitimate administrative script macros that automate software installation inputs or test execution scripts.
+level: medium
+tags:
+    - attack.defense_evasion
+    - attack.t1674
+    - analytic.an2125
+    - detection.det0982
+---
+title: Artificial Execution Delay or Anti-Sandbox Sleep (AN2126)
+id: f1a2b3c4-e5f6-7a8b-9c0d-1e2f3a4b5c87
+status: experimental
+description: "Detects command-line execution parameters that execute artificial delays or sleeping patterns (such as pinging 127.0.0.1 a large number of times, using timeout, choice with short defaults, or PowerShell Start-Sleep) commonly used to evade sandbox analysis."
+author: Krishna Gupta
+date: 2026-07-01
+logsource:
+    category: process_creation
+    product: windows
+detection:
+    selection_ping:
+        Image|endswith:
+            - '\ping.exe'
+        CommandLine|re: '(?i)ping.*(127\.0\.0\.1|localhost).*-n\s+(\d{3,})'
+    selection_ping_ofn:
+        OriginalFileName: 'ping.exe'
+        CommandLine|re: '(?i)ping.*(127\.0\.0\.1|localhost).*-n\s+(\d{3,})'
+    selection_ps_sleep:
+        Image|endswith:
+            - '\powershell.exe'
+            - '\pwsh.exe'
+        CommandLine|re: '(?i)Start-Sleep\s+-s(econds)?\s+(\d{3,})'
+    selection_ps_sleep_ofn:
+        OriginalFileName:
+            - 'PowerShell.EXE'
+            - 'pwsh.exe'
+        CommandLine|re: '(?i)Start-Sleep\s+-s(econds)?\s+(\d{3,})'
+    filter_installer:
+        ParentImage|endswith:
+            - '\msiexec.exe'
+            - '\setup.exe'
+    condition: (selection_ping or selection_ping_ofn or selection_ps_sleep or selection_ps_sleep_ofn) and not filter_installer
+fields:
+    - Image
+    - OriginalFileName
+    - CommandLine
+    - User
+falsepositives:
+    - Administrative scripts that use timeout or choice to wait for a service to start, or ping loops to verify connection status before proceeding.
+level: medium
+tags:
+    - attack.defense_evasion
+    - attack.t1678
+    - analytic.an2126
+    - detection.det0983
+---
+title: Windows Defender Selective Exclusion Configuration (AN2127)
+id: f1a2b3c4-e5f6-7a8b-9c0d-1e2f3a4b5c88
+status: experimental
+description: "Detects the modification of security tool exclusions (such as adding Windows Defender folder/process exclusions via Add-MpPreference or registry writes under the Windows Defender\\Exclusions key), which is commonly used to hide malicious files from AV scans."
+author: Krishna Gupta
+date: 2026-07-01
+logsource:
+    category: process_creation
+    product: windows
+detection:
+    selection_ps:
+        Image|endswith:
+            - '\powershell.exe'
+            - '\pwsh.exe'
+    selection_ps_ofn:
+        OriginalFileName:
+            - 'PowerShell.EXE'
+            - 'pwsh.exe'
+    selection_cli_exclusions:
+        CommandLine|contains:
+            - 'Add-MpPreference'
+            - 'Set-MpPreference'
+    selection_cli_flags:
+        CommandLine|contains:
+            - ' -ExclusionPath'
+            - ' -ExclusionProcess'
+            - ' -ExclusionExtension'
+    selection_reg_path:
+        CommandLine|contains:
+            - '\SOFTWARE\Microsoft\Windows Defender\Exclusions'
+    filter_installer:
+        ParentImage|endswith:
+            - '\msiexec.exe'
+            - '\setup.exe'
+    condition: (((selection_ps or selection_ps_ofn) and selection_cli_exclusions and selection_cli_flags) or selection_reg_path) and not filter_installer
+fields:
+    - Image
+    - OriginalFileName
+    - CommandLine
+    - User
+falsepositives:
+    - IT administrators or deployment software configuring database folders or virtual machine storage directories to be excluded from real-time antivirus scans for performance tuning.
+level: high
+tags:
+    - attack.defense_evasion
+    - attack.t1679
+    - analytic.an2127
+    - detection.det0984
+---
+title: Social Engineering Script-Based Credential Dialog Prompt (AN2128)
+id: f1a2b3c4-e5f6-7a8b-9c0d-1e2f3a4b5c89
+status: experimental
+description: "Detects process command line arguments indicating the spawning of credential dialog boxes or login forms (such as PowerShell Get-Credential or MSHTA HTML forms) used in post-exploitation to trick users into typing administrative passwords."
+author: Krishna Gupta
+date: 2026-07-01
+logsource:
+    category: process_creation
+    product: windows
+detection:
+    selection_images:
+        Image|endswith:
+            - '\powershell.exe'
+            - '\pwsh.exe'
+            - '\mshta.exe'
+            - '\wscript.exe'
+            - '\cscript.exe'
+    selection_ofn:
+        OriginalFileName:
+            - 'PowerShell.EXE'
+            - 'pwsh.exe'
+            - 'mshta.exe'
+            - 'wscript.exe'
+            - 'cscript.exe'
+    selection_cli:
+        CommandLine|contains:
+            - 'Get-Credential'
+            - 'PromptForCredential'
+    filter_installer:
+        ParentImage|endswith:
+            - '\msiexec.exe'
+            - '\setup.exe'
+    filter_admin_context:
+        ParentImage|endswith:
+            - '\powershell_ise.exe'
+            - '\vscode\Code.exe'
+            - '\mmc.exe'
+    condition: (selection_images or selection_ofn) and selection_cli and not (filter_installer or filter_admin_context)
+fields:
+    - Image
+    - OriginalFileName
+    - CommandLine
+    - User
+falsepositives:
+    - Legitimate administrative scripts that prompt the user to input credentials for running remote server tasks.
+level: high
+tags:
+    - attack.credential-access
+    - attack.t1684
+    - analytic.an2128
+    - detection.det0985

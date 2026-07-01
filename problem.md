@@ -57,7 +57,9 @@ The following rules currently utilize unmapped.* prefix schemas because the requ
 | collection/AN1410-T1025-DET0511.md | unmapped.parent_cmd_line, unmapped.parent_image |
 | collection/AN1458-T1560-DET0526.md | unmapped.parent_cmd_line, unmapped.parent_image |
 | collection/AN1589-T1114.003-DET0576.md | unmapped.parent_cmd_line, unmapped.parent_image |
+| command-and-control/AN0109-T1568-DET0039.md | unmapped.parent_image |
 | command-and-control/AN0165-T1105-DET0060.md | unmapped.parent_cmd_line, unmapped.parent_image |
+| command-and-control/AN0637-T1104-DET0228.md | unmapped.parent_image |
 | command-and-control/AN0714-T1219.002-DET0259.md | unmapped.parent_cmd_line, unmapped.parent_image |
 | credential-access/AN0105-T1555.003-DET0037.md | unmapped.parent_cmd_line, unmapped.parent_image |
 | credential-access/AN0235-T1003.002-DET0085.md | unmapped.parent_cmd_line, unmapped.parent_image |
@@ -94,13 +96,12 @@ The following rules currently utilize unmapped.* prefix schemas because the requ
 | execution/AN0009-T1574.007-DET0004.md | unmapped.parent_cmd_line, unmapped.parent_image |
 | execution/AN0108-T1574.005-DET0038.md | unmapped.parent_cmd_line, unmapped.parent_image |
 | execution/AN0172-T1059.006-DET0063.md | unmapped.parent_cmd_line, unmapped.parent_image |
-| execution/AN0176-T1574.009-DET0064.md | unmapped.parent_cmd_line, unmapped.parent_image |
+| execution/AN0176-T1574.009-DET0064.md | unmapped.event_id, unmapped.image_path, unmapped.parent_cmd_line, unmapped.parent_image, unmapped.service_name |
 | execution/AN0178-T1204.001-DET0066.md | unmapped.parent_cmd_line, unmapped.parent_image |
 | execution/AN0209-T1059.005-DET0076.md | unmapped.parent_cmd_line, unmapped.parent_image |
 | execution/AN0258-T1053-DET0094.md | unmapped.parent_cmd_line, unmapped.parent_image |
 | execution/AN0278-T1059.011-DET0101.md | unmapped.parent_cmd_line, unmapped.parent_image |
 | execution/AN0550-T1127.002-DET0191.md | unmapped.parent_cmd_line, unmapped.parent_image |
-| execution/AN0577-T1574.001-DET0201.md | unmapped.parent_cmd_line, unmapped.parent_image |
 | execution/AN0578-T1059.003-DET0202.md | unmapped.parent_cmd_line, unmapped.parent_image |
 | execution/AN0609-T1574-DET0218.md | unmapped.parent_cmd_line, unmapped.parent_image |
 | execution/AN0628-T1559.001-DET0224.md | unmapped.parent_cmd_line, unmapped.parent_image |
@@ -117,11 +118,12 @@ The following rules currently utilize unmapped.* prefix schemas because the requ
 | exfiltration/AN1571-T1567.002-DET0570.md | unmapped.parent_cmd_line, unmapped.parent_image |
 | impact/AN0061-T1489-DET0021.md | unmapped.parent_cmd_line, unmapped.parent_image |
 | impact/AN0080-T1496.002-DET0028.md | unmapped.parent_cmd_line, unmapped.parent_image |
-| impact/AN0229-T1491.001-DET0082.md | unmapped.parent_cmd_line, unmapped.parent_image |
+| impact/AN0229-T1491.001-DET0082.md | unmapped.parent_image |
 | impact/AN0334-T1531-DET0334.md | unmapped.parent_cmd_line, unmapped.parent_image |
 | impact/AN0384-T1561-DET0384.md | unmapped.parent_cmd_line, unmapped.parent_image |
 | impact/AN0411-T1485-DET0146.md | unmapped.parent_cmd_line, unmapped.parent_image |
 | impact/AN0474-T1495-DET0167.md | unmapped.parent_cmd_line, unmapped.parent_image |
+| impact/AN0489-T1499.002-DET0173.md | unmapped.parent_cmd_line, unmapped.parent_image |
 | initial-access/AN0021-T1195.001-DET0009.md | unmapped.parent_cmd_line, unmapped.parent_image |
 | initial-access/AN0188-T1566-DET0070.md | unmapped.parent_cmd_line, unmapped.parent_image |
 | initial-access/AN0219-T1190-DET0080.md | unmapped.parent_cmd_line, unmapped.parent_image |
@@ -131,22 +133,22 @@ The following rules currently utilize unmapped.* prefix schemas because the requ
 | initial-access/AN0841-T1091-DET0301.md | unmapped.parent_cmd_line, unmapped.parent_image |
 | initial-access/AN0862-T1195.002-DET0309.md | unmapped.parent_cmd_line, unmapped.parent_image |
 | initial-access/AN1004-T1133-DET0354.md | unmapped.parent_cmd_line, unmapped.parent_image |
-| initial-access/AN1035-T1195.003-DET0368.md | unmapped.parent_cmd_line, unmapped.parent_image |
+| initial-access/AN1035-T1195.003-DET0368.md | unmapped.driver_path, unmapped.parent_cmd_line, unmapped.parent_image |
 | initial-access/AN1476-T1669-DET0536.md | unmapped.parent_cmd_line, unmapped.parent_image |
 | initial-access/AN1480-T1195-DET0537.md | unmapped.parent_cmd_line, unmapped.parent_image |
-| lateral-movement/AN0216-T1563-DET0079.md | unmapped.parent_cmd_line, unmapped.parent_image |
+| lateral-movement/AN0216-T1563-DET0079.md | unmapped.event_id, unmapped.image_path, unmapped.parent_cmd_line, unmapped.parent_image, unmapped.service_name |
 | lateral-movement/AN0327-T1210-DET0118.md | unmapped.parent_cmd_line, unmapped.parent_image |
 | lateral-movement/AN0504-T1021.005-DET0178.md | unmapped.parent_cmd_line, unmapped.parent_image |
 | lateral-movement/AN0516-T1570-DET0183.md | unmapped.parent_cmd_line, unmapped.parent_image |
 | lateral-movement/AN0623-T1072-DET0223.md | unmapped.parent_cmd_line, unmapped.parent_image |
-| lateral-movement/AN0750-T1021-DET0269.md | unmapped.parent_cmd_line, unmapped.parent_image |
+| lateral-movement/AN0750-T1021-DET0269.md | unmapped.event_id, unmapped.logon_type, unmapped.parent_cmd_line, unmapped.parent_image |
 | lateral-movement/AN0791-T1021.003-DET0285.md | unmapped.parent_cmd_line, unmapped.parent_image |
 | lateral-movement/AN0931-T1021.001-DET0327.md | unmapped.parent_cmd_line, unmapped.parent_image |
 | lateral-movement/AN1313-T1021.006-DET0477.md | unmapped.parent_cmd_line, unmapped.parent_image |
-| lateral-movement/AN1468-T1021.002-DET0530.md | unmapped.parent_cmd_line, unmapped.parent_image |
-| lateral-movement/AN1620-T1563.002-DET0588.md | unmapped.parent_cmd_line, unmapped.parent_image |
+| lateral-movement/AN1468-T1021.002-DET0530.md | unmapped.event_id, unmapped.image_path, unmapped.parent_cmd_line, unmapped.parent_image, unmapped.service_name |
+| lateral-movement/AN1620-T1563.002-DET0588.md | unmapped.event_id, unmapped.image_path, unmapped.parent_cmd_line, unmapped.parent_image, unmapped.service_name |
 | persistence/AN0006-T1136.002-DET0003.md | unmapped.parent_cmd_line, unmapped.parent_image |
-| persistence/AN0045-T1668-DET0015.md | unmapped.parent_cmd_line, unmapped.parent_image |
+| persistence/AN0045-T1668-DET0015.md | unmapped.event_id, unmapped.parent_cmd_line, unmapped.parent_image |
 | persistence/AN0085-T1137.003-DET0029.md | unmapped.api_operation, unmapped.granted_access, unmapped.parent_image |
 | persistence/AN0123-T1176.001-DET0044.md | unmapped.api_operation, unmapped.granted_access, unmapped.parent_image |
 | persistence/AN0184-T1505.004-DET0068.md | unmapped.parent_cmd_line, unmapped.parent_image |
@@ -166,7 +168,7 @@ The following rules currently utilize unmapped.* prefix schemas because the requ
 | persistence/AN1507-T1505-DET0547.md | unmapped.api_operation, unmapped.granted_access, unmapped.parent_image |
 | persistence/AN1548-T1176.002-DET0561.md | unmapped.granted_access, unmapped.parent_cmd_line, unmapped.parent_image |
 | persistence/AN1604-T1136-DET0583.md | unmapped.granted_access, unmapped.parent_cmd_line, unmapped.parent_image |
-| privilege-escalation/AN0024-T1546-DET0033.md | unmapped.parent_cmd_line, unmapped.parent_image |
+| privilege-escalation/AN0024-T1546-DET0033.md | unmapped.event_id, unmapped.parent_cmd_line, unmapped.parent_image |
 | privilege-escalation/AN0051-T1546.011-DET0017.md | unmapped.parent_cmd_line, unmapped.parent_image |
 | privilege-escalation/AN0074-T1547.012-DET0029.md | unmapped.parent_cmd_line, unmapped.parent_image |
 | privilege-escalation/AN0094-T1546.008-DET0042.md | unmapped.parent_cmd_line, unmapped.parent_image |
@@ -180,8 +182,8 @@ The following rules currently utilize unmapped.* prefix schemas because the requ
 | privilege-escalation/AN1351-T1134.004-DET0489.md | unmapped.parent_cmd_line, unmapped.parent_image |
 | privilege-escalation/AN1419-T1068-DET0514.md | unmapped.driver_path |
 | privilege-escalation/AN1501-T1055.013-DET0544.md | unmapped.parent_cmd_line, unmapped.parent_image |
-| stealth/AN0071-T1218.015-DET0025.md | unmapped.parent_cmd_line, unmapped.parent_image |
-| stealth/AN0091-T1564.001-DET0032.md | unmapped.parent_cmd_line, unmapped.parent_image |
-| stealth/AN0113-T1070.009-DET0040.md | unmapped.parent_cmd_line, unmapped.parent_image |
+| stealth/AN0071-T1218.015-DET0025.md | unmapped.file_operation, unmapped.parent_cmd_line, unmapped.parent_image |
+| stealth/AN0091-T1564.001-DET0032.md | unmapped.file_operation, unmapped.parent_cmd_line, unmapped.parent_image |
+| stealth/AN0113-T1070.009-DET0040.md | unmapped.event_id, unmapped.parent_cmd_line, unmapped.parent_image, unmapped.registry_event_type, unmapped.task_name |
 | stealth/AN0118-T1218.012-DET0042.md | unmapped.parent_cmd_line, unmapped.parent_image |
 | stealth/AN0139-T1564.012-DET0051.md | unmapped.parent_cmd_line, unmapped.parent_image |

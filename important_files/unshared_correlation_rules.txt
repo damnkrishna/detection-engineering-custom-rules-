@@ -1,0 +1,4257 @@
+[
+  {
+    "ruleId": "CR0100_T1071_T1218",
+    "ruleName": "DNS Tunneling followed by Command Shell Execution",
+    "ruleFormat": "IR_v1",
+    "ruleType": "THRESHOLD",
+    "ruleOrigin": "custom",
+    "description": "Detects DNS tunneling queries followed by shell or LOLBin execution on the host within 15 minutes.",
+    "enabled": true,
+    "version": 1,
+    "correlationKey": "entity_key",
+    "eventSources": [
+      "zeek",
+      "windows_sysmon"
+    ],
+    "window": {
+      "type": "sliding",
+      "minSpanSeconds": 0,
+      "durationSeconds": 300
+    },
+    "output": {
+      "tags": [
+        "atomic-red-team",
+        "bzar"
+      ],
+      "message": "Potential DNS tunneling behavior followed by command shell execution on host",
+      "severity": "HIGH",
+      "entityField": "host.name",
+      "mitreTactics": [
+        "TA0011",
+        "TA0002"
+      ],
+      "includeFields": [],
+      "riskScoreDelta": 4,
+      "mitreTechniques": [
+        "T1071.004",
+        "T1218"
+      ]
+    },
+    "stages": [
+      {
+        "stageIndex": 0,
+        "match": {
+          "groups": [
+            {
+              "groups": [],
+              "operator": "OR",
+              "conditions": [
+                {
+                  "field": "signature_name",
+                  "value": "Anomalous DNS TXT query",
+                  "values": [],
+                  "operator": "contains"
+                },
+                {
+                  "field": "signature_name",
+                  "value": "DNS tunnel activity",
+                  "values": [],
+                  "operator": "contains"
+                }
+              ]
+            }
+          ],
+          "operator": "AND",
+          "conditions": [
+            {
+              "field": "dest_port",
+              "value": "53",
+              "values": [],
+              "operator": "equals"
+            },
+            {
+              "field": "entity_key_direction",
+              "value": "target",
+              "values": [],
+              "operator": "equals"
+            }
+          ]
+        },
+        "minGapMs": 0,
+        "aggregate": {
+          "field": null,
+          "groupBy": [
+            "host.name"
+          ],
+          "function": "count",
+          "threshold": 10,
+          "distinctField": null
+        },
+        "eventSources": [
+          "zeek"
+        ],
+        "withinSeconds": 0,
+        "minOccurrences": 10,
+        "correlation_key": "host.name",
+        "minDistinctCount": 0,
+        "requireDistinctField": null,
+        "excludeSignatureContains": []
+      },
+      {
+        "stageIndex": 1,
+        "match": {
+          "groups": [
+            {
+              "groups": [
+                {
+                  "groups": [],
+                  "operator": "AND",
+                  "conditions": [
+                    {
+                      "field": "process_name",
+                      "value": "cmd.exe",
+                      "values": [
+                        "cmd.exe",
+                        "powershell.exe",
+                        "pwsh.exe",
+                        "wscript.exe",
+                        "cscript.exe",
+                        "rundll32.exe",
+                        "regsvr32.exe",
+                        "certutil.exe"
+                      ],
+                      "operator": "in"
+                    },
+                    {
+                      "field": "command_line",
+                      "value": "-enc",
+                      "values": [
+                        "-enc",
+                        "encodedcommand",
+                        "download",
+                        "iex",
+                        "invoke-",
+                        "bypass",
+                        "-nop",
+                        "hidden"
+                      ],
+                      "operator": "in"
+                    }
+                  ]
+                }
+              ],
+              "operator": "OR",
+              "conditions": [
+                {
+                  "field": "signature_name",
+                  "value": "Command Shell Spawned",
+                  "values": [],
+                  "operator": "contains"
+                }
+              ]
+            }
+          ],
+          "operator": "AND",
+          "conditions": [
+            {
+              "field": "parent_process_name",
+              "value": "explorer.exe",
+              "values": [
+                "explorer.exe",
+                "svchost.exe",
+                "msiexec.exe"
+              ],
+              "operator": "not_in"
+            }
+          ]
+        },
+        "minGapMs": 0,
+        "aggregate": {
+          "field": null,
+          "groupBy": [
+            "host.name"
+          ],
+          "function": "count",
+          "threshold": 1,
+          "distinctField": null
+        },
+        "eventSources": [
+          "windows_sysmon"
+        ],
+        "withinSeconds": 300,
+        "minOccurrences": 0,
+        "correlation_key": "host.name",
+        "minDistinctCount": 0,
+        "requireDistinctField": null,
+        "excludeSignatureContains": []
+      }
+    ],
+    "suppression": {
+      "groupBy": [
+        "host.name"
+      ],
+      "durationSeconds": 300
+    },
+    "maxGapSeconds": 300,
+    "behavioralConstraints": null,
+    "maxConcurrentInstances": 0
+  },
+  {
+    "ruleId": "CR0101_T1071_T1055",
+    "ruleName": "Anomalous HTTPS C2 Beaconing followed by Local Process Injection",
+    "ruleFormat": "IR_v1",
+    "ruleType": "THRESHOLD",
+    "ruleOrigin": "custom",
+    "description": "Detects SSL beaconing connection patterns followed by thread injection (Sysmon Event ID 8) into system processes within 30 minutes.",
+    "enabled": true,
+    "version": 1,
+    "correlationKey": "entity_key",
+    "eventSources": [
+      "zeek",
+      "windows_sysmon"
+    ],
+    "window": {
+      "type": "sliding",
+      "minSpanSeconds": 0,
+      "durationSeconds": 1800
+    },
+    "output": {
+      "tags": [
+        "atomic-red-team",
+        "bzar"
+      ],
+      "message": "Outbound HTTPS beaconing pattern and local thread injection detected",
+      "severity": "CRITICAL",
+      "entityField": "host.name",
+      "mitreTactics": [
+        "TA0011",
+        "TA0005"
+      ],
+      "includeFields": [],
+      "riskScoreDelta": 5,
+      "mitreTechniques": [
+        "T1071.001",
+        "T1055"
+      ]
+    },
+    "stages": [
+      {
+        "stageIndex": 0,
+        "match": {
+          "groups": [
+            {
+              "groups": [],
+              "operator": "OR",
+              "conditions": [
+                {
+                  "field": "signature_name",
+                  "value": "Periodic SSL connection",
+                  "values": [],
+                  "operator": "contains"
+                },
+                {
+                  "field": "signature_name",
+                  "value": "Anomalous beaconing pattern",
+                  "values": [],
+                  "operator": "contains"
+                }
+              ]
+            }
+          ],
+          "operator": "AND",
+          "conditions": []
+        },
+        "minGapMs": 0,
+        "aggregate": {
+          "field": null,
+          "groupBy": [],
+          "function": "count",
+          "threshold": 5,
+          "distinctField": null
+        },
+        "eventSources": [
+          "zeek"
+        ],
+        "withinSeconds": 0,
+        "minOccurrences": 5,
+        "correlation_key": "host.name",
+        "minDistinctCount": 0,
+        "requireDistinctField": null,
+        "excludeSignatureContains": []
+      },
+      {
+        "stageIndex": 1,
+        "match": {
+          "groups": [
+            {
+              "groups": [],
+              "operator": "OR",
+              "conditions": [
+                {
+                  "field": "signature_name",
+                  "value": "Thread injected",
+                  "values": [],
+                  "operator": "contains"
+                },
+                {
+                  "field": "signature_name",
+                  "value": "Thread injected",
+                  "values": [],
+                  "operator": "contains"
+                }
+              ]
+            }
+          ],
+          "operator": "AND",
+          "conditions": []
+        },
+        "minGapMs": 0,
+        "aggregate": {
+          "field": null,
+          "groupBy": [],
+          "function": "count",
+          "threshold": 1,
+          "distinctField": null
+        },
+        "eventSources": [
+          "windows_sysmon"
+        ],
+        "withinSeconds": 1800,
+        "minOccurrences": 0,
+        "correlation_key": "host.name",
+        "minDistinctCount": 0,
+        "requireDistinctField": null,
+        "excludeSignatureContains": []
+      }
+    ],
+    "suppression": {
+      "groupBy": [
+        "host.name"
+      ],
+      "durationSeconds": 300
+    },
+    "maxGapSeconds": 0,
+    "behavioralConstraints": null,
+    "maxConcurrentInstances": 0
+  },
+  {
+    "ruleId": "CR0102_T1572_T1059",
+    "ruleName": "SSH Inbound Connection followed by Reverse Shell Spawn",
+    "ruleFormat": "IR_v1",
+    "ruleType": "THRESHOLD",
+    "ruleOrigin": "custom",
+    "description": "Detects inbound SSH connection followed by powershell.exe making outbound network connections within 15 minutes.",
+    "enabled": true,
+    "version": 1,
+    "correlationKey": "entity_key",
+    "eventSources": [
+      "zeek",
+      "windows_sysmon"
+    ],
+    "window": {
+      "type": "sliding",
+      "minSpanSeconds": 0,
+      "durationSeconds": 900
+    },
+    "output": {
+      "tags": [
+        "atomic-red-team",
+        "bzar"
+      ],
+      "message": "Inbound SSH connection followed by PowerShell reverse shell activity detected",
+      "severity": "HIGH",
+      "entityField": "host.name",
+      "mitreTactics": [
+        "TA0011",
+        "TA0002"
+      ],
+      "includeFields": [],
+      "riskScoreDelta": 4,
+      "mitreTechniques": [
+        "T1572",
+        "T1059.001"
+      ]
+    },
+    "stages": [
+      {
+        "stageIndex": 0,
+        "match": {
+          "groups": [
+            {
+              "groups": [],
+              "operator": "OR",
+              "conditions": [
+                {
+                  "field": "signature_name",
+                  "value": "SSH connection",
+                  "values": [],
+                  "operator": "contains"
+                },
+                {
+                  "field": "signature_name",
+                  "value": "SSH tunnel established",
+                  "values": [],
+                  "operator": "contains"
+                }
+              ]
+            }
+          ],
+          "operator": "AND",
+          "conditions": []
+        },
+        "minGapMs": 0,
+        "aggregate": {
+          "field": null,
+          "groupBy": [],
+          "function": "count",
+          "threshold": 1,
+          "distinctField": null
+        },
+        "eventSources": [
+          "zeek"
+        ],
+        "withinSeconds": 0,
+        "minOccurrences": 0,
+        "correlation_key": "host.name",
+        "minDistinctCount": 0,
+        "requireDistinctField": null,
+        "excludeSignatureContains": []
+      },
+      {
+        "stageIndex": 1,
+        "match": {
+          "groups": [
+            {
+              "groups": [],
+              "operator": "AND",
+              "conditions": [
+                {
+                  "field": "signature_name",
+                  "value": "Network connection initiated",
+                  "values": [],
+                  "operator": "contains"
+                },
+                {
+                  "field": "process_name",
+                  "value": "powershell.exe",
+                  "values": [
+                    "powershell.exe",
+                    "pwsh.exe"
+                  ],
+                  "operator": "in"
+                }
+              ]
+            }
+          ],
+          "operator": "AND",
+          "conditions": []
+        },
+        "minGapMs": 0,
+        "aggregate": {
+          "field": null,
+          "groupBy": [],
+          "function": "count",
+          "threshold": 1,
+          "distinctField": null
+        },
+        "eventSources": [
+          "windows_sysmon"
+        ],
+        "withinSeconds": 900,
+        "minOccurrences": 0,
+        "correlation_key": "host.name",
+        "minDistinctCount": 0,
+        "requireDistinctField": null,
+        "excludeSignatureContains": []
+      }
+    ],
+    "suppression": {
+      "groupBy": [
+        "host.name"
+      ],
+      "durationSeconds": 300
+    },
+    "maxGapSeconds": 0,
+    "behavioralConstraints": null,
+    "maxConcurrentInstances": 0
+  },
+  {
+    "ruleId": "CR0103_T1095_T1572",
+    "ruleName": "Non-Standard Outbound Port Traffic followed by Local Port Forwarding",
+    "ruleFormat": "IR_v1",
+    "ruleType": "THRESHOLD",
+    "ruleOrigin": "custom",
+    "description": "Detects host communicating outbound over unexpected ports followed by local netsh execution to redirect traffic within 15 minutes.",
+    "enabled": true,
+    "version": 1,
+    "correlationKey": "entity_key",
+    "eventSources": [
+      "zeek",
+      "windows_sysmon"
+    ],
+    "window": {
+      "type": "sliding",
+      "minSpanSeconds": 0,
+      "durationSeconds": 900
+    },
+    "output": {
+      "tags": [
+        "atomic-red-team",
+        "bzar"
+      ],
+      "message": "Outbound non-standard port communication followed by netsh port forwarding configuration detected",
+      "severity": "HIGH",
+      "entityField": "host.name",
+      "mitreTactics": [
+        "TA0011",
+        "TA0005"
+      ],
+      "includeFields": [],
+      "riskScoreDelta": 4,
+      "mitreTechniques": [
+        "T1095",
+        "T1572"
+      ]
+    },
+    "stages": [
+      {
+        "stageIndex": 0,
+        "match": {
+          "groups": [
+            {
+              "groups": [],
+              "operator": "OR",
+              "conditions": [
+                {
+                  "field": "signature_name",
+                  "value": "Outbound connection on non-standard port",
+                  "values": [],
+                  "operator": "contains"
+                },
+                {
+                  "field": "signature_name",
+                  "value": "Anomalous outbound destination port",
+                  "values": [],
+                  "operator": "contains"
+                }
+              ]
+            }
+          ],
+          "operator": "AND",
+          "conditions": []
+        },
+        "minGapMs": 0,
+        "aggregate": {
+          "field": null,
+          "groupBy": [],
+          "function": "count",
+          "threshold": 1,
+          "distinctField": null
+        },
+        "eventSources": [
+          "zeek"
+        ],
+        "withinSeconds": 0,
+        "minOccurrences": 0,
+        "correlation_key": "host.name",
+        "minDistinctCount": 0,
+        "requireDistinctField": null,
+        "excludeSignatureContains": []
+      },
+      {
+        "stageIndex": 1,
+        "match": {
+          "groups": [
+            {
+              "groups": [],
+              "operator": "AND",
+              "conditions": [
+                {
+                  "field": "process_name",
+                  "value": "netsh.exe",
+                  "values": [],
+                  "operator": "equals"
+                },
+                {
+                  "field": "command_line",
+                  "value": "portproxy",
+                  "values": [],
+                  "operator": "contains"
+                }
+              ]
+            }
+          ],
+          "operator": "AND",
+          "conditions": []
+        },
+        "minGapMs": 0,
+        "aggregate": {
+          "field": null,
+          "groupBy": [],
+          "function": "count",
+          "threshold": 1,
+          "distinctField": null
+        },
+        "eventSources": [
+          "windows_sysmon"
+        ],
+        "withinSeconds": 900,
+        "minOccurrences": 0,
+        "correlation_key": "host.name",
+        "minDistinctCount": 0,
+        "requireDistinctField": null,
+        "excludeSignatureContains": []
+      }
+    ],
+    "suppression": {
+      "groupBy": [
+        "host.name"
+      ],
+      "durationSeconds": 300
+    },
+    "maxGapSeconds": 0,
+    "behavioralConstraints": null,
+    "maxConcurrentInstances": 0
+  },
+  {
+    "ruleId": "CR0104_T1095_T1204",
+    "ruleName": "ICMP Tunneling / Large ICMP Payload Exchange",
+    "ruleFormat": "IR_v1",
+    "ruleType": "THRESHOLD",
+    "ruleOrigin": "custom",
+    "description": "Detects large ICMP payloads followed by local execution of unrecognized network binaries within 15 minutes.",
+    "enabled": true,
+    "version": 1,
+    "correlationKey": "entity_key",
+    "eventSources": [
+      "suricata",
+      "windows_sysmon"
+    ],
+    "window": {
+      "type": "sliding",
+      "minSpanSeconds": 0,
+      "durationSeconds": 900
+    },
+    "output": {
+      "tags": [
+        "atomic-red-team",
+        "bzar"
+      ],
+      "message": "Outbound/inbound ICMP tunneling payloads followed by process execution detected",
+      "severity": "HIGH",
+      "entityField": "host.name",
+      "mitreTactics": [
+        "TA0011",
+        "TA0002"
+      ],
+      "includeFields": [],
+      "riskScoreDelta": 4,
+      "mitreTechniques": [
+        "T1095",
+        "T1204"
+      ]
+    },
+    "stages": [
+      {
+        "stageIndex": 0,
+        "match": {
+          "groups": [
+            {
+              "groups": [],
+              "operator": "OR",
+              "conditions": [
+                {
+                  "field": "signature_name",
+                  "value": "Anomalous ICMP payload size",
+                  "values": [],
+                  "operator": "contains"
+                },
+                {
+                  "field": "signature_name",
+                  "value": "ICMP tunnel",
+                  "values": [],
+                  "operator": "contains"
+                }
+              ]
+            }
+          ],
+          "operator": "AND",
+          "conditions": [
+            {
+              "field": "entity_key_direction",
+              "value": "target",
+              "values": [],
+              "operator": "equals"
+            }
+          ]
+        },
+        "minGapMs": 0,
+        "aggregate": {
+          "field": null,
+          "groupBy": [
+            "host.name"
+          ],
+          "function": "count",
+          "threshold": 5,
+          "distinctField": null
+        },
+        "eventSources": [
+          "suricata"
+        ],
+        "withinSeconds": 120,
+        "minOccurrences": 5,
+        "correlation_key": "host.name",
+        "minDistinctCount": 0,
+        "requireDistinctField": null,
+        "excludeSignatureContains": []
+      },
+      {
+        "stageIndex": 1,
+        "match": {
+          "groups": [
+            {
+              "groups": [],
+              "operator": "AND",
+              "conditions": [
+                {
+                  "field": "signature_name",
+                  "value": "Process Created",
+                  "values": [],
+                  "operator": "contains"
+                },
+                {
+                  "field": "image",
+                  "value": "Temp",
+                  "values": [
+                    "\\Temp\\",
+                    "\\Public\\"
+                  ],
+                  "operator": "in"
+                }
+              ]
+            }
+          ],
+          "operator": "AND",
+          "conditions": [
+            {
+              "field": "parent_process_name",
+              "value": "explorer.exe",
+              "values": [
+                "explorer.exe",
+                "msiexec.exe",
+                "iexplore.exe"
+              ],
+              "operator": "not_in"
+            }
+          ]
+        },
+        "minGapMs": 0,
+        "aggregate": {
+          "field": null,
+          "groupBy": [
+            "host.name"
+          ],
+          "function": "count",
+          "threshold": 1,
+          "distinctField": null
+        },
+        "eventSources": [
+          "windows_sysmon"
+        ],
+        "withinSeconds": 900,
+        "minOccurrences": 0,
+        "correlation_key": "host.name",
+        "minDistinctCount": 0,
+        "requireDistinctField": null,
+        "excludeSignatureContains": []
+      }
+    ],
+    "suppression": {
+      "groupBy": [
+        "host.name"
+      ],
+      "durationSeconds": 300
+    },
+    "maxGapSeconds": 900,
+    "behavioralConstraints": null,
+    "maxConcurrentInstances": 0
+  },
+  {
+    "ruleId": "CR0105_T1071_T1560",
+    "ruleName": "Anomalous HTTP POST/GET Ratio followed by File Staging",
+    "ruleFormat": "IR_v1",
+    "ruleType": "THRESHOLD",
+    "ruleOrigin": "custom",
+    "description": "Detects high ratio of HTTP POST bytes outbound followed by archive utility execution on the host within 30 minutes.",
+    "enabled": true,
+    "version": 1,
+    "correlationKey": "entity_key",
+    "eventSources": [
+      "zeek",
+      "windows_sysmon"
+    ],
+    "window": {
+      "type": "sliding",
+      "minSpanSeconds": 0,
+      "durationSeconds": 1800
+    },
+    "output": {
+      "tags": [
+        "atomic-red-team",
+        "bzar"
+      ],
+      "message": "Anomalous HTTP POST transfer volume followed by file staging compression detected",
+      "severity": "HIGH",
+      "entityField": "host.name",
+      "mitreTactics": [
+        "TA0011",
+        "TA0009"
+      ],
+      "includeFields": [],
+      "riskScoreDelta": 4,
+      "mitreTechniques": [
+        "T1071.001",
+        "T1560"
+      ]
+    },
+    "stages": [
+      {
+        "stageIndex": 0,
+        "match": {
+          "groups": [
+            {
+              "groups": [],
+              "operator": "OR",
+              "conditions": [
+                {
+                  "field": "signature_name",
+                  "value": "High HTTP POST ratio",
+                  "values": [],
+                  "operator": "contains"
+                },
+                {
+                  "field": "signature_name",
+                  "value": "Anomalous outbound HTTP payload",
+                  "values": [],
+                  "operator": "contains"
+                }
+              ]
+            }
+          ],
+          "operator": "AND",
+          "conditions": []
+        },
+        "minGapMs": 0,
+        "aggregate": {
+          "field": null,
+          "groupBy": [],
+          "function": "count",
+          "threshold": 1,
+          "distinctField": null
+        },
+        "eventSources": [
+          "zeek"
+        ],
+        "withinSeconds": 0,
+        "minOccurrences": 0,
+        "correlation_key": "host.name",
+        "minDistinctCount": 0,
+        "requireDistinctField": null,
+        "excludeSignatureContains": []
+      },
+      {
+        "stageIndex": 1,
+        "match": {
+          "groups": [
+            {
+              "groups": [],
+              "operator": "OR",
+              "conditions": [
+                {
+                  "field": "signature_name",
+                  "value": "Compression Utility Executed",
+                  "values": [],
+                  "operator": "contains"
+                },
+                {
+                  "field": "process_name",
+                  "value": "7z.exe",
+                  "values": [],
+                  "operator": "equals"
+                },
+                {
+                  "field": "process_name",
+                  "value": "winrar.exe",
+                  "values": [],
+                  "operator": "equals"
+                }
+              ]
+            }
+          ],
+          "operator": "AND",
+          "conditions": []
+        },
+        "minGapMs": 0,
+        "aggregate": {
+          "field": null,
+          "groupBy": [],
+          "function": "count",
+          "threshold": 1,
+          "distinctField": null
+        },
+        "eventSources": [
+          "windows_sysmon"
+        ],
+        "withinSeconds": 1800,
+        "minOccurrences": 0,
+        "correlation_key": "host.name",
+        "minDistinctCount": 0,
+        "requireDistinctField": null,
+        "excludeSignatureContains": []
+      }
+    ],
+    "suppression": {
+      "groupBy": [
+        "host.name"
+      ],
+      "durationSeconds": 300
+    },
+    "maxGapSeconds": 0,
+    "behavioralConstraints": null,
+    "maxConcurrentInstances": 0
+  },
+  {
+    "ruleId": "CR0106_T1568_T1003",
+    "ruleName": "DGA DNS Query Burst followed by LSASS Access",
+    "ruleFormat": "IR_v1",
+    "ruleType": "THRESHOLD",
+    "ruleOrigin": "custom",
+    "description": "Detects massive NXDOMAIN DNS responses followed by LSASS memory dumping on the host within 30 minutes.",
+    "enabled": true,
+    "version": 1,
+    "correlationKey": "entity_key",
+    "eventSources": [
+      "zeek",
+      "windows_sysmon"
+    ],
+    "window": {
+      "type": "sliding",
+      "minSpanSeconds": 0,
+      "durationSeconds": 1800
+    },
+    "output": {
+      "tags": [
+        "atomic-red-team",
+        "bzar"
+      ],
+      "message": "Potential DGA C2 activity and LSASS memory access detected on host",
+      "severity": "HIGH",
+      "entityField": "host.name",
+      "mitreTactics": [
+        "TA0011",
+        "TA0006"
+      ],
+      "includeFields": [],
+      "riskScoreDelta": 4,
+      "mitreTechniques": [
+        "T1568.002",
+        "T1003.001"
+      ]
+    },
+    "stages": [
+      {
+        "stageIndex": 0,
+        "match": {
+          "groups": [
+            {
+              "groups": [],
+              "operator": "OR",
+              "conditions": [
+                {
+                  "field": "signature_name",
+                  "value": "NXDOMAIN burst",
+                  "values": [],
+                  "operator": "contains"
+                },
+                {
+                  "field": "signature_name",
+                  "value": "DGA activity detected",
+                  "values": [],
+                  "operator": "contains"
+                }
+              ]
+            }
+          ],
+          "operator": "AND",
+          "conditions": [
+            {
+              "field": "entity_key_direction",
+              "value": "target",
+              "values": [],
+              "operator": "equals"
+            }
+          ]
+        },
+        "minGapMs": 0,
+        "aggregate": {
+          "field": null,
+          "groupBy": [
+            "host.name"
+          ],
+          "function": "count",
+          "threshold": 10,
+          "distinctField": null
+        },
+        "eventSources": [
+          "zeek"
+        ],
+        "withinSeconds": 0,
+        "minOccurrences": 10,
+        "correlation_key": "host.name",
+        "minDistinctCount": 0,
+        "requireDistinctField": null,
+        "excludeSignatureContains": []
+      },
+      {
+        "stageIndex": 1,
+        "match": {
+          "groups": [
+            {
+              "groups": [],
+              "operator": "OR",
+              "conditions": [
+                {
+                  "field": "signature_name",
+                  "value": "LSASS process access",
+                  "values": [],
+                  "operator": "contains"
+                },
+                {
+                  "field": "target_process_name",
+                  "value": "lsass.exe",
+                  "values": [],
+                  "operator": "equals"
+                }
+              ]
+            }
+          ],
+          "operator": "AND",
+          "conditions": [
+            {
+              "field": "granted_access",
+              "value": "0x1010",
+              "values": [],
+              "operator": "contains"
+            },
+            {
+              "field": "calling_process_name",
+              "value": "MsMpEng.exe",
+              "values": [
+                "MsMpEng.exe",
+                "cb.exe",
+                "SentinelAgent.exe",
+                "CortexXDR.exe",
+                "elastic-agent.exe",
+                "xagt.exe"
+              ],
+              "operator": "not_in"
+            }
+          ]
+        },
+        "minGapMs": 0,
+        "aggregate": {
+          "field": null,
+          "groupBy": [
+            "host.name"
+          ],
+          "function": "count",
+          "threshold": 1,
+          "distinctField": null
+        },
+        "eventSources": [
+          "windows_sysmon"
+        ],
+        "withinSeconds": 1800,
+        "minOccurrences": 0,
+        "correlation_key": "host.name",
+        "minDistinctCount": 0,
+        "requireDistinctField": null,
+        "excludeSignatureContains": []
+      }
+    ],
+    "suppression": {
+      "groupBy": [
+        "host.name"
+      ],
+      "durationSeconds": 300
+    },
+    "maxGapSeconds": 1800,
+    "behavioralConstraints": null,
+    "maxConcurrentInstances": 0
+  },
+  {
+    "ruleId": "CR0107_T1090_T1136",
+    "ruleName": "Tor Network Connection followed by Local Account Creation",
+    "ruleFormat": "IR_v1",
+    "ruleType": "THRESHOLD",
+    "ruleOrigin": "custom",
+    "description": "Detects connection to Tor entry nodes followed by new local user account creation within 30 minutes.",
+    "enabled": true,
+    "version": 1,
+    "correlationKey": "entity_key",
+    "eventSources": [
+      "zeek",
+      "windows_sysmon"
+    ],
+    "window": {
+      "type": "sliding",
+      "minSpanSeconds": 0,
+      "durationSeconds": 1800
+    },
+    "output": {
+      "tags": [
+        "atomic-red-team",
+        "bzar"
+      ],
+      "message": "Tor proxy connection followed by local user account creation detected",
+      "severity": "HIGH",
+      "entityField": "host.name",
+      "mitreTactics": [
+        "TA0011",
+        "TA0003"
+      ],
+      "includeFields": [],
+      "riskScoreDelta": 4,
+      "mitreTechniques": [
+        "T1090.003",
+        "T1136.001"
+      ]
+    },
+    "stages": [
+      {
+        "stageIndex": 0,
+        "match": {
+          "groups": [
+            {
+              "groups": [],
+              "operator": "OR",
+              "conditions": [
+                {
+                  "field": "signature_name",
+                  "value": "Connection to Tor node",
+                  "values": [],
+                  "operator": "contains"
+                },
+                {
+                  "field": "signature_name",
+                  "value": "Tor proxy traffic",
+                  "values": [],
+                  "operator": "contains"
+                }
+              ]
+            }
+          ],
+          "operator": "AND",
+          "conditions": [
+            {
+              "field": "entity_key_direction",
+              "value": "source",
+              "values": [],
+              "operator": "equals"
+            }
+          ]
+        },
+        "minGapMs": 0,
+        "aggregate": {
+          "field": null,
+          "groupBy": [
+            "host.name"
+          ],
+          "function": "count",
+          "threshold": 3,
+          "distinctField": null
+        },
+        "eventSources": [
+          "zeek"
+        ],
+        "withinSeconds": 300,
+        "minOccurrences": 3,
+        "correlation_key": "host.name",
+        "minDistinctCount": 0,
+        "requireDistinctField": null,
+        "excludeSignatureContains": []
+      },
+      {
+        "stageIndex": 1,
+        "match": {
+          "groups": [
+            {
+              "groups": [
+                {
+                  "groups": [],
+                  "operator": "AND",
+                  "conditions": [
+                    {
+                      "field": "process_name",
+                      "value": "net.exe",
+                      "values": [
+                        "net.exe",
+                        "net1.exe"
+                      ],
+                      "operator": "in"
+                    },
+                    {
+                      "field": "command_line",
+                      "value": "user",
+                      "values": [],
+                      "operator": "contains"
+                    },
+                    {
+                      "field": "command_line",
+                      "value": "add",
+                      "values": [],
+                      "operator": "contains"
+                    },
+                    {
+                      "field": "user",
+                      "value": "SYSTEM",
+                      "values": [
+                        "SYSTEM",
+                        "NT AUTHORITY\\SYSTEM",
+                        "NT AUTHORITY\\LOCAL SERVICE",
+                        "NT AUTHORITY\\NETWORK SERVICE"
+                      ],
+                      "operator": "not_in"
+                    }
+                  ]
+                }
+              ],
+              "operator": "OR",
+              "conditions": [
+                {
+                  "field": "signature_name",
+                  "value": "User Account Created",
+                  "values": [],
+                  "operator": "contains"
+                }
+              ]
+            }
+          ],
+          "operator": "AND",
+          "conditions": []
+        },
+        "minGapMs": 0,
+        "aggregate": {
+          "field": null,
+          "groupBy": [
+            "host.name"
+          ],
+          "function": "count",
+          "threshold": 1,
+          "distinctField": null
+        },
+        "eventSources": [
+          "windows_sysmon"
+        ],
+        "withinSeconds": 1800,
+        "minOccurrences": 0,
+        "correlation_key": "host.name",
+        "minDistinctCount": 0,
+        "requireDistinctField": null,
+        "excludeSignatureContains": []
+      }
+    ],
+    "suppression": {
+      "groupBy": [
+        "host.name"
+      ],
+      "durationSeconds": 300
+    },
+    "maxGapSeconds": 1800,
+    "behavioralConstraints": null,
+    "maxConcurrentInstances": 0
+  },
+  {
+    "ruleId": "CR0108_T1071_T1218",
+    "ruleName": "Cobalt Strike Malleable Profile HTTP Request Match",
+    "ruleFormat": "IR_v1",
+    "ruleType": "THRESHOLD",
+    "ruleOrigin": "custom",
+    "description": "Detects Cobalt Strike HTTP request traffic followed by rundll32.exe executing with empty arguments on the host within 15 minutes.",
+    "enabled": true,
+    "version": 1,
+    "correlationKey": "entity_key",
+    "eventSources": [
+      "suricata",
+      "windows_sysmon"
+    ],
+    "window": {
+      "type": "sliding",
+      "minSpanSeconds": 0,
+      "durationSeconds": 900
+    },
+    "output": {
+      "tags": [
+        "atomic-red-team",
+        "bzar"
+      ],
+      "message": "Cobalt Strike malleable C2 traffic and suspicious rundll32.exe execution detected",
+      "severity": "HIGH",
+      "entityField": "host.name",
+      "mitreTactics": [
+        "TA0011",
+        "TA0005"
+      ],
+      "includeFields": [],
+      "riskScoreDelta": 4,
+      "mitreTechniques": [
+        "T1071.001",
+        "T1218.011"
+      ]
+    },
+    "stages": [
+      {
+        "stageIndex": 0,
+        "match": {
+          "groups": [
+            {
+              "groups": [],
+              "operator": "OR",
+              "conditions": [
+                {
+                  "field": "signature_name",
+                  "value": "Cobalt Strike HTTP request",
+                  "values": [],
+                  "operator": "contains"
+                },
+                {
+                  "field": "signature_name",
+                  "value": "Cobalt Strike C2 traffic",
+                  "values": [],
+                  "operator": "contains"
+                }
+              ]
+            }
+          ],
+          "operator": "AND",
+          "conditions": []
+        },
+        "minGapMs": 0,
+        "aggregate": {
+          "field": null,
+          "groupBy": [],
+          "function": "count",
+          "threshold": 1,
+          "distinctField": null
+        },
+        "eventSources": [
+          "suricata"
+        ],
+        "withinSeconds": 0,
+        "minOccurrences": 0,
+        "correlation_key": "host.name",
+        "minDistinctCount": 0,
+        "requireDistinctField": null,
+        "excludeSignatureContains": []
+      },
+      {
+        "stageIndex": 1,
+        "match": {
+          "groups": [
+            {
+              "groups": [],
+              "operator": "AND",
+              "conditions": [
+                {
+                  "field": "process_name",
+                  "value": "rundll32.exe",
+                  "values": [],
+                  "operator": "equals"
+                },
+                {
+                  "field": "command_line",
+                  "value": "\"rundll32.exe\"",
+                  "values": [],
+                  "operator": "equals"
+                }
+              ]
+            }
+          ],
+          "operator": "AND",
+          "conditions": []
+        },
+        "minGapMs": 0,
+        "aggregate": {
+          "field": null,
+          "groupBy": [],
+          "function": "count",
+          "threshold": 1,
+          "distinctField": null
+        },
+        "eventSources": [
+          "windows_sysmon"
+        ],
+        "withinSeconds": 900,
+        "minOccurrences": 0,
+        "correlation_key": "host.name",
+        "minDistinctCount": 0,
+        "requireDistinctField": null,
+        "excludeSignatureContains": []
+      }
+    ],
+    "suppression": {
+      "groupBy": [
+        "host.name"
+      ],
+      "durationSeconds": 300
+    },
+    "maxGapSeconds": 0,
+    "behavioralConstraints": null,
+    "maxConcurrentInstances": 0
+  },
+  {
+    "ruleId": "CR0109_T1568_T1218",
+    "ruleName": "Dynamic DNS Domain Request followed by certutil Download",
+    "ruleFormat": "IR_v1",
+    "ruleType": "THRESHOLD",
+    "ruleOrigin": "custom",
+    "description": "Detects DNS request for DDNS domains followed by certutil.exe file download on the host within 15 minutes.",
+    "enabled": true,
+    "version": 1,
+    "correlationKey": "entity_key",
+    "eventSources": [
+      "zeek",
+      "windows_sysmon"
+    ],
+    "window": {
+      "type": "sliding",
+      "minSpanSeconds": 0,
+      "durationSeconds": 900
+    },
+    "output": {
+      "tags": [
+        "atomic-red-team",
+        "bzar"
+      ],
+      "message": "Dynamic DNS domain lookup and certutil download execution detected",
+      "severity": "MEDIUM",
+      "entityField": "host.name",
+      "mitreTactics": [
+        "TA0011",
+        "TA0002"
+      ],
+      "includeFields": [],
+      "riskScoreDelta": 3,
+      "mitreTechniques": [
+        "T1568",
+        "T1218.007"
+      ]
+    },
+    "stages": [
+      {
+        "stageIndex": 0,
+        "match": {
+          "groups": [
+            {
+              "groups": [],
+              "operator": "OR",
+              "conditions": [
+                {
+                  "field": "signature_name",
+                  "value": "Dynamic DNS query",
+                  "values": [],
+                  "operator": "contains"
+                },
+                {
+                  "field": "signature_name",
+                  "value": "DDNS resolution",
+                  "values": [],
+                  "operator": "contains"
+                }
+              ]
+            }
+          ],
+          "operator": "AND",
+          "conditions": []
+        },
+        "minGapMs": 0,
+        "aggregate": {
+          "field": null,
+          "groupBy": [],
+          "function": "count",
+          "threshold": 1,
+          "distinctField": null
+        },
+        "eventSources": [
+          "zeek"
+        ],
+        "withinSeconds": 0,
+        "minOccurrences": 0,
+        "correlation_key": "host.name",
+        "minDistinctCount": 0,
+        "requireDistinctField": null,
+        "excludeSignatureContains": []
+      },
+      {
+        "stageIndex": 1,
+        "match": {
+          "groups": [
+            {
+              "groups": [],
+              "operator": "AND",
+              "conditions": [
+                {
+                  "field": "process_name",
+                  "value": "certutil.exe",
+                  "values": [],
+                  "operator": "equals"
+                },
+                {
+                  "field": "command_line",
+                  "value": "urlcache",
+                  "values": [],
+                  "operator": "contains"
+                }
+              ]
+            }
+          ],
+          "operator": "AND",
+          "conditions": []
+        },
+        "minGapMs": 0,
+        "aggregate": {
+          "field": null,
+          "groupBy": [],
+          "function": "count",
+          "threshold": 1,
+          "distinctField": null
+        },
+        "eventSources": [
+          "windows_sysmon"
+        ],
+        "withinSeconds": 900,
+        "minOccurrences": 0,
+        "correlation_key": "host.name",
+        "minDistinctCount": 0,
+        "requireDistinctField": null,
+        "excludeSignatureContains": []
+      }
+    ],
+    "suppression": {
+      "groupBy": [
+        "host.name"
+      ],
+      "durationSeconds": 300
+    },
+    "maxGapSeconds": 0,
+    "behavioralConstraints": null,
+    "maxConcurrentInstances": 0
+  },
+  {
+    "ruleId": "CR0110_T1071_T1204",
+    "ruleName": "SMTP/IMAP Traffic from Non-Mail Client Binary",
+    "ruleFormat": "IR_v1",
+    "ruleType": "THRESHOLD",
+    "ruleOrigin": "custom",
+    "description": "Detects outbound SMTP or IMAP connection followed by a non-mail client binary initiating the traffic within 15 minutes.",
+    "enabled": true,
+    "version": 1,
+    "correlationKey": "entity_key",
+    "eventSources": [
+      "zeek",
+      "windows_sysmon"
+    ],
+    "window": {
+      "type": "sliding",
+      "minSpanSeconds": 0,
+      "durationSeconds": 900
+    },
+    "output": {
+      "tags": [
+        "atomic-red-team",
+        "bzar"
+      ],
+      "message": "Mail protocol connection established by non-mail client binary detected",
+      "severity": "MEDIUM",
+      "entityField": "host.name",
+      "mitreTactics": [
+        "TA0011",
+        "TA0002"
+      ],
+      "includeFields": [],
+      "riskScoreDelta": 3,
+      "mitreTechniques": [
+        "T1071.003",
+        "T1204"
+      ]
+    },
+    "stages": [
+      {
+        "stageIndex": 0,
+        "match": {
+          "groups": [
+            {
+              "groups": [],
+              "operator": "OR",
+              "conditions": [
+                {
+                  "field": "signature_name",
+                  "value": "SMTP connection outbound",
+                  "values": [],
+                  "operator": "contains"
+                },
+                {
+                  "field": "signature_name",
+                  "value": "IMAP traffic detected",
+                  "values": [],
+                  "operator": "contains"
+                }
+              ]
+            }
+          ],
+          "operator": "AND",
+          "conditions": []
+        },
+        "minGapMs": 0,
+        "aggregate": {
+          "field": null,
+          "groupBy": [],
+          "function": "count",
+          "threshold": 1,
+          "distinctField": null
+        },
+        "eventSources": [
+          "zeek"
+        ],
+        "withinSeconds": 0,
+        "minOccurrences": 0,
+        "correlation_key": "host.name",
+        "minDistinctCount": 0,
+        "requireDistinctField": null,
+        "excludeSignatureContains": []
+      },
+      {
+        "stageIndex": 1,
+        "match": {
+          "groups": [
+            {
+              "groups": [],
+              "operator": "AND",
+              "conditions": [
+                {
+                  "field": "signature_name",
+                  "value": "Network connection initiated",
+                  "values": [],
+                  "operator": "contains"
+                },
+                {
+                  "field": "process_name",
+                  "value": "outlook.exe",
+                  "values": [
+                    "outlook.exe",
+                    "thunderbird.exe",
+                    "mail.exe"
+                  ],
+                  "operator": "not_in"
+                }
+              ]
+            }
+          ],
+          "operator": "AND",
+          "conditions": []
+        },
+        "minGapMs": 0,
+        "aggregate": {
+          "field": null,
+          "groupBy": [],
+          "function": "count",
+          "threshold": 1,
+          "distinctField": null
+        },
+        "eventSources": [
+          "windows_sysmon"
+        ],
+        "withinSeconds": 900,
+        "minOccurrences": 0,
+        "correlation_key": "host.name",
+        "minDistinctCount": 0,
+        "requireDistinctField": null,
+        "excludeSignatureContains": []
+      }
+    ],
+    "suppression": {
+      "groupBy": [
+        "host.name"
+      ],
+      "durationSeconds": 300
+    },
+    "maxGapSeconds": 0,
+    "behavioralConstraints": null,
+    "maxConcurrentInstances": 0
+  },
+  {
+    "ruleId": "CR0111_T1071_T1059",
+    "ruleName": "IRC Protocol Outbound followed by PowerShell IEX Execution",
+    "ruleFormat": "IR_v1",
+    "ruleType": "THRESHOLD",
+    "ruleOrigin": "custom",
+    "description": "Detects IRC connection followed by Invoke-Expression (IEX) command execution on the host within 15 minutes.",
+    "enabled": true,
+    "version": 1,
+    "correlationKey": "entity_key",
+    "eventSources": [
+      "zeek",
+      "windows_sysmon"
+    ],
+    "window": {
+      "type": "sliding",
+      "minSpanSeconds": 0,
+      "durationSeconds": 900
+    },
+    "output": {
+      "tags": [
+        "atomic-red-team",
+        "bzar"
+      ],
+      "message": "IRC outbound session followed by PowerShell IEX execution detected",
+      "severity": "MEDIUM",
+      "entityField": "host.name",
+      "mitreTactics": [
+        "TA0011",
+        "TA0002"
+      ],
+      "includeFields": [],
+      "riskScoreDelta": 3,
+      "mitreTechniques": [
+        "T1071.002",
+        "T1059.001"
+      ]
+    },
+    "stages": [
+      {
+        "stageIndex": 0,
+        "match": {
+          "groups": [
+            {
+              "groups": [],
+              "operator": "OR",
+              "conditions": [
+                {
+                  "field": "signature_name",
+                  "value": "IRC connection established",
+                  "values": [],
+                  "operator": "contains"
+                },
+                {
+                  "field": "signature_name",
+                  "value": "Outbound IRC traffic",
+                  "values": [],
+                  "operator": "contains"
+                }
+              ]
+            }
+          ],
+          "operator": "AND",
+          "conditions": []
+        },
+        "minGapMs": 0,
+        "aggregate": {
+          "field": null,
+          "groupBy": [],
+          "function": "count",
+          "threshold": 1,
+          "distinctField": null
+        },
+        "eventSources": [
+          "zeek"
+        ],
+        "withinSeconds": 0,
+        "minOccurrences": 0,
+        "correlation_key": "host.name",
+        "minDistinctCount": 0,
+        "requireDistinctField": null,
+        "excludeSignatureContains": []
+      },
+      {
+        "stageIndex": 1,
+        "match": {
+          "groups": [
+            {
+              "groups": [],
+              "operator": "AND",
+              "conditions": [
+                {
+                  "field": "process_name",
+                  "value": "powershell.exe",
+                  "values": [],
+                  "operator": "equals"
+                },
+                {
+                  "field": "command_line",
+                  "value": "iex",
+                  "values": [
+                    "iex",
+                    "Invoke-Expression"
+                  ],
+                  "operator": "in"
+                }
+              ]
+            }
+          ],
+          "operator": "AND",
+          "conditions": []
+        },
+        "minGapMs": 0,
+        "aggregate": {
+          "field": null,
+          "groupBy": [],
+          "function": "count",
+          "threshold": 1,
+          "distinctField": null
+        },
+        "eventSources": [
+          "windows_sysmon"
+        ],
+        "withinSeconds": 900,
+        "minOccurrences": 0,
+        "correlation_key": "host.name",
+        "minDistinctCount": 0,
+        "requireDistinctField": null,
+        "excludeSignatureContains": []
+      }
+    ],
+    "suppression": {
+      "groupBy": [
+        "host.name"
+      ],
+      "durationSeconds": 300
+    },
+    "maxGapSeconds": 0,
+    "behavioralConstraints": null,
+    "maxConcurrentInstances": 0
+  },
+  {
+    "ruleId": "CR0112_T1205_T1021",
+    "ruleName": "Port Knocking Sequence followed by SMB Share Access",
+    "ruleFormat": "IR_v1",
+    "ruleType": "THRESHOLD",
+    "ruleOrigin": "custom",
+    "description": "Detects sequential connection attempts (port knocking) followed by successful administrative SMB share access on the host within 10 minutes.",
+    "enabled": true,
+    "version": 1,
+    "correlationKey": "entity_key",
+    "eventSources": [
+      "zeek",
+      "suricata"
+    ],
+    "window": {
+      "type": "sliding",
+      "minSpanSeconds": 0,
+      "durationSeconds": 600
+    },
+    "output": {
+      "tags": [
+        "atomic-red-team",
+        "bzar"
+      ],
+      "message": "Port knocking signature sequence followed by SMB administrative share access detected",
+      "severity": "HIGH",
+      "entityField": "host.name",
+      "mitreTactics": [
+        "TA0011",
+        "TA0008"
+      ],
+      "includeFields": [],
+      "riskScoreDelta": 4,
+      "mitreTechniques": [
+        "T1205",
+        "T1021.002"
+      ]
+    },
+    "stages": [
+      {
+        "stageIndex": 0,
+        "match": {
+          "groups": [
+            {
+              "groups": [],
+              "operator": "OR",
+              "conditions": [
+                {
+                  "field": "signature_name",
+                  "value": "Port knocking sequence",
+                  "values": [],
+                  "operator": "contains"
+                },
+                {
+                  "field": "signature_name",
+                  "value": "Anomalous connection sequence",
+                  "values": [],
+                  "operator": "contains"
+                }
+              ]
+            }
+          ],
+          "operator": "AND",
+          "conditions": []
+        },
+        "minGapMs": 0,
+        "aggregate": {
+          "field": null,
+          "groupBy": [],
+          "function": "count",
+          "threshold": 1,
+          "distinctField": null
+        },
+        "eventSources": [
+          "zeek"
+        ],
+        "withinSeconds": 0,
+        "minOccurrences": 0,
+        "correlation_key": "destination.ip",
+        "minDistinctCount": 0,
+        "requireDistinctField": null,
+        "excludeSignatureContains": []
+      },
+      {
+        "stageIndex": 1,
+        "match": {
+          "groups": [
+            {
+              "groups": [],
+              "operator": "OR",
+              "conditions": [
+                {
+                  "field": "signature_name",
+                  "value": "SMB admin$ share access",
+                  "values": [],
+                  "operator": "contains"
+                },
+                {
+                  "field": "signature_name",
+                  "value": "SMB c$ share access",
+                  "values": [],
+                  "operator": "contains"
+                }
+              ]
+            }
+          ],
+          "operator": "AND",
+          "conditions": [
+            {
+              "field": "entity_key_direction",
+              "value": "target",
+              "values": [],
+              "operator": "equals"
+            }
+          ]
+        },
+        "minGapMs": 0,
+        "aggregate": {
+          "field": null,
+          "groupBy": [],
+          "function": "count",
+          "threshold": 1,
+          "distinctField": null
+        },
+        "eventSources": [
+          "suricata"
+        ],
+        "withinSeconds": 600,
+        "minOccurrences": 0,
+        "correlation_key": "destination.ip",
+        "minDistinctCount": 0,
+        "requireDistinctField": null,
+        "excludeSignatureContains": []
+      }
+    ],
+    "suppression": {
+      "groupBy": [
+        "host.name"
+      ],
+      "durationSeconds": 300
+    },
+    "maxGapSeconds": 0,
+    "behavioralConstraints": null,
+    "maxConcurrentInstances": 0
+  },
+  {
+    "ruleId": "CR0087_T1021_T1053",
+    "ruleName": "SMB Share File Write followed by Scheduled Task Creation",
+    "ruleFormat": "IR_v1",
+    "ruleType": "THRESHOLD",
+    "ruleOrigin": "custom",
+    "description": "Detects lateral movement via SMB share file write (copying execution payloads) followed by scheduled task execution on the target host within 30 minutes.",
+    "enabled": true,
+    "version": 1,
+    "correlationKey": "entity_key",
+    "eventSources": [
+      "suricata",
+      "windows_sysmon"
+    ],
+    "window": {
+      "type": "sliding",
+      "minSpanSeconds": 0,
+      "durationSeconds": 1800
+    },
+    "output": {
+      "tags": [
+        "atomic-red-team",
+        "bzar"
+      ],
+      "message": "Potential lateral movement payload copy followed by scheduled task execution detected on host",
+      "severity": "HIGH",
+      "entityField": "host.name",
+      "mitreTactics": [
+        "TA0008",
+        "TA0002"
+      ],
+      "includeFields": [],
+      "riskScoreDelta": 4,
+      "mitreTechniques": [
+        "T1021.002",
+        "T1053.005"
+      ]
+    },
+    "stages": [
+      {
+        "stageIndex": 0,
+        "match": {
+          "groups": [
+            {
+              "groups": [],
+              "operator": "OR",
+              "conditions": [
+                {
+                  "field": "signature_name",
+                  "value": "SMB admin$ share access",
+                  "values": [],
+                  "operator": "contains"
+                },
+                {
+                  "field": "signature_name",
+                  "value": "SMB c$ share access",
+                  "values": [],
+                  "operator": "contains"
+                },
+                {
+                  "field": "signature_name",
+                  "value": "SMB IPC$ share access",
+                  "values": [],
+                  "operator": "contains"
+                },
+                {
+                  "field": "signature_name",
+                  "value": "File Created",
+                  "values": [],
+                  "operator": "contains"
+                },
+                {
+                  "field": "signature_name",
+                  "value": "Network Share Object Accessed",
+                  "values": [],
+                  "operator": "contains"
+                }
+              ]
+            }
+          ],
+          "operator": "AND",
+          "conditions": [
+            {
+              "field": "entity_key_direction",
+              "value": "target",
+              "values": [],
+              "operator": "equals"
+            }
+          ]
+        },
+        "minGapMs": 0,
+        "aggregate": {
+          "field": null,
+          "groupBy": [],
+          "function": "count",
+          "threshold": 1,
+          "distinctField": null
+        },
+        "eventSources": [
+          "suricata",
+          "windows_sysmon"
+        ],
+        "withinSeconds": 0,
+        "minOccurrences": 0,
+        "correlation_key": "host.name",
+        "minDistinctCount": 0,
+        "requireDistinctField": null,
+        "excludeSignatureContains": []
+      },
+      {
+        "stageIndex": 1,
+        "match": {
+          "groups": [
+            {
+              "groups": [],
+              "operator": "OR",
+              "conditions": [
+                {
+                  "field": "signature_name",
+                  "value": "Scheduled Task Created",
+                  "values": [],
+                  "operator": "contains"
+                },
+                {
+                  "field": "signature_name",
+                  "value": "schtasks",
+                  "values": [],
+                  "operator": "contains"
+                },
+                {
+                  "field": "signature_name",
+                  "value": "AT scheduled task",
+                  "values": [],
+                  "operator": "contains"
+                }
+              ]
+            }
+          ],
+          "operator": "AND",
+          "conditions": []
+        },
+        "minGapMs": 0,
+        "aggregate": {
+          "field": null,
+          "groupBy": [],
+          "function": "count",
+          "threshold": 1,
+          "distinctField": null
+        },
+        "eventSources": [
+          "windows_sysmon"
+        ],
+        "withinSeconds": 1800,
+        "minOccurrences": 0,
+        "correlation_key": "host.name",
+        "minDistinctCount": 0,
+        "requireDistinctField": null,
+        "excludeSignatureContains": []
+      }
+    ],
+    "suppression": {
+      "groupBy": [
+        "host.name"
+      ],
+      "durationSeconds": 300
+    },
+    "maxGapSeconds": 0,
+    "behavioralConstraints": null,
+    "maxConcurrentInstances": 0
+  },
+  {
+    "ruleId": "CR0088_T1021_T1003",
+    "ruleName": "RDP Tunneling over SSH followed by LSASS dumping",
+    "ruleFormat": "IR_v1",
+    "ruleType": "THRESHOLD",
+    "ruleOrigin": "custom",
+    "description": "Detects an SSH connection to a host followed by a local RDP logon on loopback and LSASS memory access within 30 minutes.",
+    "enabled": true,
+    "version": 1,
+    "correlationKey": "entity_key",
+    "eventSources": [
+      "zeek",
+      "windows_sysmon"
+    ],
+    "window": {
+      "type": "sliding",
+      "minSpanSeconds": 0,
+      "durationSeconds": 1800
+    },
+    "output": {
+      "tags": [
+        "atomic-red-team",
+        "mitre-attack"
+      ],
+      "message": "Potential RDP tunneling over SSH and LSASS dumping credential extraction on host",
+      "severity": "CRITICAL",
+      "entityField": "host.name",
+      "mitreTactics": [
+        "TA0008",
+        "TA0006",
+        "TA0011"
+      ],
+      "includeFields": [],
+      "riskScoreDelta": 5,
+      "mitreTechniques": [
+        "T1021.005",
+        "T1003.001",
+        "T1572"
+      ]
+    },
+    "stages": [
+      {
+        "stageIndex": 0,
+        "match": {
+          "groups": [
+            {
+              "groups": [],
+              "operator": "OR",
+              "conditions": [
+                {
+                  "field": "signature_name",
+                  "value": "SSH connection",
+                  "values": [],
+                  "operator": "contains"
+                },
+                {
+                  "field": "signature_name",
+                  "value": "SSH tunnel established",
+                  "values": [],
+                  "operator": "contains"
+                }
+              ]
+            }
+          ],
+          "operator": "AND",
+          "conditions": [
+            {
+              "field": "entity_key_direction",
+              "value": "target",
+              "values": [],
+              "operator": "equals"
+            }
+          ]
+        },
+        "minGapMs": 0,
+        "aggregate": {
+          "field": null,
+          "groupBy": [],
+          "function": "count",
+          "threshold": 1,
+          "distinctField": null
+        },
+        "eventSources": [
+          "zeek"
+        ],
+        "withinSeconds": 0,
+        "minOccurrences": 0,
+        "correlation_key": "host.name",
+        "minDistinctCount": 0,
+        "requireDistinctField": null,
+        "excludeSignatureContains": []
+      },
+      {
+        "stageIndex": 1,
+        "match": {
+          "groups": [
+            {
+              "groups": [],
+              "operator": "AND",
+              "conditions": [
+                {
+                  "field": "signature_name",
+                  "value": "Successful Logon",
+                  "values": [],
+                  "operator": "contains"
+                },
+                {
+                  "field": "source_ip",
+                  "value": "127.0.0.1",
+                  "values": [
+                    "127.0.0.1",
+                    "::1"
+                  ],
+                  "operator": "in"
+                },
+                {
+                  "field": "logon_type",
+                  "value": "10",
+                  "values": [
+                    "3",
+                    "10"
+                  ],
+                  "operator": "in"
+                }
+              ]
+            }
+          ],
+          "operator": "AND",
+          "conditions": []
+        },
+        "minGapMs": 0,
+        "aggregate": {
+          "field": null,
+          "groupBy": [],
+          "function": "count",
+          "threshold": 1,
+          "distinctField": null
+        },
+        "eventSources": [
+          "windows_sysmon"
+        ],
+        "withinSeconds": 1800,
+        "minOccurrences": 0,
+        "correlation_key": "host.name",
+        "minDistinctCount": 0,
+        "requireDistinctField": null,
+        "excludeSignatureContains": []
+      },
+      {
+        "stageIndex": 2,
+        "match": {
+          "groups": [
+            {
+              "groups": [],
+              "operator": "OR",
+              "conditions": [
+                {
+                  "field": "signature_name",
+                  "value": "LSASS process access",
+                  "values": [],
+                  "operator": "contains"
+                },
+                {
+                  "field": "target_process_name",
+                  "value": "lsass.exe",
+                  "values": [],
+                  "operator": "equals"
+                }
+              ]
+            }
+          ],
+          "operator": "AND",
+          "conditions": [
+            {
+              "field": "granted_access",
+              "value": "0x1010",
+              "values": [],
+              "operator": "contains"
+            }
+          ]
+        },
+        "minGapMs": 0,
+        "aggregate": {
+          "field": null,
+          "groupBy": [],
+          "function": "count",
+          "threshold": 1,
+          "distinctField": null
+        },
+        "eventSources": [
+          "windows_sysmon"
+        ],
+        "withinSeconds": 1800,
+        "minOccurrences": 0,
+        "correlation_key": "host.name",
+        "minDistinctCount": 0,
+        "requireDistinctField": null,
+        "excludeSignatureContains": []
+      }
+    ],
+    "suppression": {
+      "groupBy": [
+        "host.name"
+      ],
+      "durationSeconds": 300
+    },
+    "maxGapSeconds": 0,
+    "behavioralConstraints": null,
+    "maxConcurrentInstances": 0
+  },
+  {
+    "ruleId": "CR0089_T1110_T1021",
+    "ruleName": "SMB Password Spray followed by Remote Share Write",
+    "ruleFormat": "IR_v1",
+    "ruleType": "THRESHOLD",
+    "ruleOrigin": "custom",
+    "description": "Detects network-wide SMB authentication failures from a source IP targeting multiple destinations, followed by a successful write/access to an administrative share from the same source IP within 30 minutes.",
+    "enabled": true,
+    "version": 1,
+    "correlationKey": "src_ip",
+    "eventSources": [
+      "zeek",
+      "suricata",
+      "windows_sysmon"
+    ],
+    "window": {
+      "type": "sliding",
+      "minSpanSeconds": 0,
+      "durationSeconds": 1800
+    },
+    "output": {
+      "tags": [
+        "atomic-red-team",
+        "bzar"
+      ],
+      "message": "Potential SMB password spraying followed by lateral movement payload write from source IP",
+      "severity": "HIGH",
+      "entityField": "source.ip",
+      "mitreTactics": [
+        "TA0006",
+        "TA0008"
+      ],
+      "includeFields": [],
+      "riskScoreDelta": 4,
+      "mitreTechniques": [
+        "T1110.003",
+        "T1021.002"
+      ]
+    },
+    "stages": [
+      {
+        "stageIndex": 0,
+        "match": {
+          "groups": [
+            {
+              "groups": [],
+              "operator": "OR",
+              "conditions": [
+                {
+                  "field": "signature_name",
+                  "value": "SMB authentication failure",
+                  "values": [],
+                  "operator": "contains"
+                },
+                {
+                  "field": "signature_name",
+                  "value": "SMB login failed",
+                  "values": [],
+                  "operator": "contains"
+                }
+              ]
+            }
+          ],
+          "operator": "AND",
+          "conditions": []
+        },
+        "minGapMs": 0,
+        "aggregate": {
+          "field": null,
+          "groupBy": [],
+          "function": "count",
+          "threshold": 5,
+          "distinctField": "dest_ip"
+        },
+        "eventSources": [
+          "zeek",
+          "suricata"
+        ],
+        "withinSeconds": 0,
+        "minOccurrences": 5,
+        "correlation_key": "source.ip",
+        "minDistinctCount": 3,
+        "requireDistinctField": "dest_ip",
+        "excludeSignatureContains": []
+      },
+      {
+        "stageIndex": 1,
+        "match": {
+          "groups": [
+            {
+              "groups": [],
+              "operator": "OR",
+              "conditions": [
+                {
+                  "field": "signature_name",
+                  "value": "SMB admin$ share access",
+                  "values": [],
+                  "operator": "contains"
+                },
+                {
+                  "field": "signature_name",
+                  "value": "SMB c$ share access",
+                  "values": [],
+                  "operator": "contains"
+                },
+                {
+                  "field": "signature_name",
+                  "value": "Network Share Object Accessed",
+                  "values": [],
+                  "operator": "contains"
+                }
+              ]
+            }
+          ],
+          "operator": "AND",
+          "conditions": [
+            {
+              "field": "entity_key_direction",
+              "value": "target",
+              "values": [],
+              "operator": "equals"
+            }
+          ]
+        },
+        "minGapMs": 0,
+        "aggregate": {
+          "field": null,
+          "groupBy": [],
+          "function": "count",
+          "threshold": 1,
+          "distinctField": null
+        },
+        "eventSources": [
+          "suricata",
+          "windows_sysmon"
+        ],
+        "withinSeconds": 1800,
+        "minOccurrences": 0,
+        "correlation_key": "source.ip",
+        "minDistinctCount": 0,
+        "requireDistinctField": null,
+        "excludeSignatureContains": []
+      }
+    ],
+    "suppression": {
+      "groupBy": [
+        "source.ip"
+      ],
+      "durationSeconds": 300
+    },
+    "maxGapSeconds": 0,
+    "behavioralConstraints": null,
+    "maxConcurrentInstances": 0
+  },
+  {
+    "ruleId": "CR0090_T1021_T1059",
+    "ruleName": "WinRM Remote Command Execution followed by Process Spawn",
+    "ruleFormat": "IR_v1",
+    "ruleType": "THRESHOLD",
+    "ruleOrigin": "custom",
+    "description": "Detects WinRM protocol connection followed by cmd.exe, powershell.exe, or another scripting tool spawning under wsmprovhost.exe within 15 minutes.",
+    "enabled": true,
+    "version": 1,
+    "correlationKey": "entity_key",
+    "eventSources": [
+      "zeek",
+      "windows_sysmon"
+    ],
+    "window": {
+      "type": "sliding",
+      "minSpanSeconds": 0,
+      "durationSeconds": 900
+    },
+    "output": {
+      "tags": [
+        "atomic-red-team",
+        "bzar"
+      ],
+      "message": "WinRM connection followed by shell process execution detected on target host",
+      "severity": "HIGH",
+      "entityField": "host.name",
+      "mitreTactics": [
+        "TA0008",
+        "TA0002"
+      ],
+      "includeFields": [],
+      "riskScoreDelta": 4,
+      "mitreTechniques": [
+        "T1021.006",
+        "T1059.001"
+      ]
+    },
+    "stages": [
+      {
+        "stageIndex": 0,
+        "match": {
+          "groups": [
+            {
+              "groups": [],
+              "operator": "OR",
+              "conditions": [
+                {
+                  "field": "signature_name",
+                  "value": "WinRM traffic",
+                  "values": [],
+                  "operator": "contains"
+                },
+                {
+                  "field": "signature_name",
+                  "value": "WS-Management connection",
+                  "values": [],
+                  "operator": "contains"
+                }
+              ]
+            }
+          ],
+          "operator": "AND",
+          "conditions": []
+        },
+        "minGapMs": 0,
+        "aggregate": {
+          "field": null,
+          "groupBy": [],
+          "function": "count",
+          "threshold": 1,
+          "distinctField": null
+        },
+        "eventSources": [
+          "zeek"
+        ],
+        "withinSeconds": 0,
+        "minOccurrences": 0,
+        "correlation_key": "host.name",
+        "minDistinctCount": 0,
+        "requireDistinctField": null,
+        "excludeSignatureContains": []
+      },
+      {
+        "stageIndex": 1,
+        "match": {
+          "groups": [
+            {
+              "groups": [],
+              "operator": "OR",
+              "conditions": [
+                {
+                  "field": "parent_process_name",
+                  "value": "wsmprovhost.exe",
+                  "values": [],
+                  "operator": "equals"
+                },
+                {
+                  "field": "process_name",
+                  "value": "wsmprovhost.exe",
+                  "values": [],
+                  "operator": "equals"
+                }
+              ]
+            }
+          ],
+          "operator": "AND",
+          "conditions": []
+        },
+        "minGapMs": 0,
+        "aggregate": {
+          "field": null,
+          "groupBy": [],
+          "function": "count",
+          "threshold": 1,
+          "distinctField": null
+        },
+        "eventSources": [
+          "windows_sysmon"
+        ],
+        "withinSeconds": 900,
+        "minOccurrences": 0,
+        "correlation_key": "host.name",
+        "minDistinctCount": 0,
+        "requireDistinctField": null,
+        "excludeSignatureContains": []
+      }
+    ],
+    "suppression": {
+      "groupBy": [
+        "host.name"
+      ],
+      "durationSeconds": 300
+    },
+    "maxGapSeconds": 0,
+    "behavioralConstraints": null,
+    "maxConcurrentInstances": 0
+  },
+  {
+    "ruleId": "CR0091_T1021_T1543",
+    "ruleName": "PsExec Lateral Movement Service Creation",
+    "ruleFormat": "IR_v1",
+    "ruleType": "THRESHOLD",
+    "ruleOrigin": "custom",
+    "description": "Detects SMB administrative share write followed by new service registration (Event ID 7045) on the target host within 15 minutes.",
+    "enabled": true,
+    "version": 1,
+    "correlationKey": "entity_key",
+    "eventSources": [
+      "suricata",
+      "windows_sysmon"
+    ],
+    "window": {
+      "type": "sliding",
+      "minSpanSeconds": 0,
+      "durationSeconds": 900
+    },
+    "output": {
+      "tags": [
+        "atomic-red-team",
+        "bzar"
+      ],
+      "message": "Potential PsExec lateral movement and service registration detected on host",
+      "severity": "HIGH",
+      "entityField": "host.name",
+      "mitreTactics": [
+        "TA0008",
+        "TA0002"
+      ],
+      "includeFields": [],
+      "riskScoreDelta": 4,
+      "mitreTechniques": [
+        "T1021.002",
+        "T1543.003"
+      ]
+    },
+    "stages": [
+      {
+        "stageIndex": 0,
+        "match": {
+          "groups": [
+            {
+              "groups": [],
+              "operator": "OR",
+              "conditions": [
+                {
+                  "field": "signature_name",
+                  "value": "SMB admin$ share access",
+                  "values": [],
+                  "operator": "contains"
+                },
+                {
+                  "field": "signature_name",
+                  "value": "SMB c$ share access",
+                  "values": [],
+                  "operator": "contains"
+                }
+              ]
+            }
+          ],
+          "operator": "AND",
+          "conditions": [
+            {
+              "field": "entity_key_direction",
+              "value": "target",
+              "values": [],
+              "operator": "equals"
+            }
+          ]
+        },
+        "minGapMs": 0,
+        "aggregate": {
+          "field": null,
+          "groupBy": [],
+          "function": "count",
+          "threshold": 1,
+          "distinctField": null
+        },
+        "eventSources": [
+          "suricata"
+        ],
+        "withinSeconds": 0,
+        "minOccurrences": 0,
+        "correlation_key": "host.name",
+        "minDistinctCount": 0,
+        "requireDistinctField": null,
+        "excludeSignatureContains": []
+      },
+      {
+        "stageIndex": 1,
+        "match": {
+          "groups": [
+            {
+              "groups": [
+                {
+                  "groups": [],
+                  "operator": "AND",
+                  "conditions": [
+                    {
+                      "field": "signature_name",
+                      "value": "Process Created",
+                      "values": [],
+                      "operator": "contains"
+                    },
+                    {
+                      "field": "parent_process_name",
+                      "value": "services.exe",
+                      "values": [],
+                      "operator": "equals"
+                    }
+                  ]
+                }
+              ],
+              "operator": "OR",
+              "conditions": [
+                {
+                  "field": "signature_name",
+                  "value": "Service Installed",
+                  "values": [],
+                  "operator": "contains"
+                },
+                {
+                  "field": "signature_name",
+                  "value": "psexesvc",
+                  "values": [],
+                  "operator": "contains"
+                },
+                {
+                  "field": "service_path",
+                  "value": "ADMIN$",
+                  "values": [],
+                  "operator": "contains"
+                }
+              ]
+            }
+          ],
+          "operator": "AND",
+          "conditions": []
+        },
+        "minGapMs": 0,
+        "aggregate": {
+          "field": null,
+          "groupBy": [],
+          "function": "count",
+          "threshold": 1,
+          "distinctField": null
+        },
+        "eventSources": [
+          "windows_sysmon"
+        ],
+        "withinSeconds": 900,
+        "minOccurrences": 0,
+        "correlation_key": "host.name",
+        "minDistinctCount": 0,
+        "requireDistinctField": null,
+        "excludeSignatureContains": []
+      }
+    ],
+    "suppression": {
+      "groupBy": [
+        "host.name"
+      ],
+      "durationSeconds": 300
+    },
+    "maxGapSeconds": 0,
+    "behavioralConstraints": null,
+    "maxConcurrentInstances": 0
+  },
+  {
+    "ruleId": "CR0092_T1021_T1047",
+    "ruleName": "WMI Remote Process Spawning",
+    "ruleFormat": "IR_v1",
+    "ruleType": "THRESHOLD",
+    "ruleOrigin": "custom",
+    "description": "Detects RPC traffic over port 135 followed by wmiprvse.exe spawning command shells or scripting tools within 15 minutes.",
+    "enabled": true,
+    "version": 1,
+    "correlationKey": "entity_key",
+    "eventSources": [
+      "zeek",
+      "windows_sysmon"
+    ],
+    "window": {
+      "type": "sliding",
+      "minSpanSeconds": 0,
+      "durationSeconds": 900
+    },
+    "output": {
+      "tags": [
+        "atomic-red-team",
+        "bzar"
+      ],
+      "message": "RPC WMI connection followed by wmiprvse.exe spawning process shell on host",
+      "severity": "HIGH",
+      "entityField": "host.name",
+      "mitreTactics": [
+        "TA0008",
+        "TA0002"
+      ],
+      "includeFields": [],
+      "riskScoreDelta": 4,
+      "mitreTechniques": [
+        "T1021.003",
+        "T1047"
+      ]
+    },
+    "stages": [
+      {
+        "stageIndex": 0,
+        "match": {
+          "groups": [
+            {
+              "groups": [],
+              "operator": "OR",
+              "conditions": [
+                {
+                  "field": "signature_name",
+                  "value": "RPC traffic",
+                  "values": [],
+                  "operator": "contains"
+                },
+                {
+                  "field": "signature_name",
+                  "value": "WMI connection established",
+                  "values": [],
+                  "operator": "contains"
+                }
+              ]
+            }
+          ],
+          "operator": "AND",
+          "conditions": [
+            {
+              "field": "dest_port",
+              "value": "135",
+              "values": [],
+              "operator": "equals"
+            },
+            {
+              "field": "entity_key_direction",
+              "value": "target",
+              "values": [],
+              "operator": "equals"
+            }
+          ]
+        },
+        "minGapMs": 0,
+        "aggregate": {
+          "field": null,
+          "groupBy": [
+            "host.name"
+          ],
+          "function": "count",
+          "threshold": 1,
+          "distinctField": null
+        },
+        "eventSources": [
+          "zeek"
+        ],
+        "withinSeconds": 0,
+        "minOccurrences": 0,
+        "correlation_key": "host.name",
+        "minDistinctCount": 0,
+        "requireDistinctField": null,
+        "excludeSignatureContains": []
+      },
+      {
+        "stageIndex": 1,
+        "match": {
+          "groups": [
+            {
+              "groups": [],
+              "operator": "OR",
+              "conditions": [
+                {
+                  "field": "process_name",
+                  "value": "cmd.exe",
+                  "values": [
+                    "cmd.exe",
+                    "powershell.exe",
+                    "pwsh.exe",
+                    "cscript.exe",
+                    "wscript.exe"
+                  ],
+                  "operator": "in"
+                }
+              ]
+            }
+          ],
+          "operator": "AND",
+          "conditions": [
+            {
+              "field": "parent_process_name",
+              "value": "wmiprvse.exe",
+              "values": [],
+              "operator": "equals"
+            }
+          ]
+        },
+        "minGapMs": 0,
+        "aggregate": {
+          "field": null,
+          "groupBy": [
+            "host.name"
+          ],
+          "function": "count",
+          "threshold": 1,
+          "distinctField": null
+        },
+        "eventSources": [
+          "windows_sysmon"
+        ],
+        "withinSeconds": 900,
+        "minOccurrences": 0,
+        "correlation_key": "host.name",
+        "minDistinctCount": 0,
+        "requireDistinctField": null,
+        "excludeSignatureContains": []
+      }
+    ],
+    "suppression": {
+      "groupBy": [
+        "host.name"
+      ],
+      "durationSeconds": 300
+    },
+    "maxGapSeconds": 900,
+    "behavioralConstraints": null,
+    "maxConcurrentInstances": 0
+  },
+  {
+    "ruleId": "CR0093_T1550_T1078",
+    "ruleName": "Pass-the-Hash (PtH) NTLM Network Authentication",
+    "ruleFormat": "IR_v1",
+    "ruleType": "THRESHOLD",
+    "ruleOrigin": "custom",
+    "description": "Detects local administrator NTLM network authentication followed by successful logon (Logon Type 3 NTLM) on the target host within 15 minutes.",
+    "enabled": true,
+    "version": 1,
+    "correlationKey": "entity_key",
+    "eventSources": [
+      "zeek",
+      "windows_sysmon"
+    ],
+    "window": {
+      "type": "sliding",
+      "minSpanSeconds": 0,
+      "durationSeconds": 900
+    },
+    "output": {
+      "tags": [
+        "atomic-red-team",
+        "bzar"
+      ],
+      "message": "Potential Pass-the-Hash administrative NTLM authentication detected on host",
+      "severity": "HIGH",
+      "entityField": "host.name",
+      "mitreTactics": [
+        "TA0008",
+        "TA0006"
+      ],
+      "includeFields": [],
+      "riskScoreDelta": 4,
+      "mitreTechniques": [
+        "T1550.002",
+        "T1078.002"
+      ]
+    },
+    "stages": [
+      {
+        "stageIndex": 0,
+        "match": {
+          "groups": [
+            {
+              "groups": [],
+              "operator": "OR",
+              "conditions": [
+                {
+                  "field": "signature_name",
+                  "value": "NTLM authentication",
+                  "values": [],
+                  "operator": "contains"
+                },
+                {
+                  "field": "signature_name",
+                  "value": "NTLM network logon",
+                  "values": [],
+                  "operator": "contains"
+                }
+              ]
+            }
+          ],
+          "operator": "AND",
+          "conditions": []
+        },
+        "minGapMs": 0,
+        "aggregate": {
+          "field": null,
+          "groupBy": [],
+          "function": "count",
+          "threshold": 1,
+          "distinctField": null
+        },
+        "eventSources": [
+          "zeek"
+        ],
+        "withinSeconds": 0,
+        "minOccurrences": 0,
+        "correlation_key": "host.name",
+        "minDistinctCount": 0,
+        "requireDistinctField": null,
+        "excludeSignatureContains": []
+      },
+      {
+        "stageIndex": 1,
+        "match": {
+          "groups": [
+            {
+              "groups": [],
+              "operator": "AND",
+              "conditions": [
+                {
+                  "field": "signature_name",
+                  "value": "Successful Logon",
+                  "values": [],
+                  "operator": "contains"
+                },
+                {
+                  "field": "logon_process",
+                  "value": "NtLmSsp",
+                  "values": [],
+                  "operator": "contains"
+                },
+                {
+                  "field": "logon_type",
+                  "value": "3",
+                  "values": [],
+                  "operator": "equals"
+                },
+                {
+                  "field": "key_length",
+                  "value": "0",
+                  "values": [],
+                  "operator": "equals"
+                }
+              ]
+            }
+          ],
+          "operator": "AND",
+          "conditions": []
+        },
+        "minGapMs": 0,
+        "aggregate": {
+          "field": null,
+          "groupBy": [],
+          "function": "count",
+          "threshold": 1,
+          "distinctField": null
+        },
+        "eventSources": [
+          "windows_sysmon"
+        ],
+        "withinSeconds": 900,
+        "minOccurrences": 0,
+        "correlation_key": "host.name",
+        "minDistinctCount": 0,
+        "requireDistinctField": null,
+        "excludeSignatureContains": []
+      }
+    ],
+    "suppression": {
+      "groupBy": [
+        "host.name"
+      ],
+      "durationSeconds": 300
+    },
+    "maxGapSeconds": 0,
+    "behavioralConstraints": null,
+    "maxConcurrentInstances": 0
+  },
+  {
+    "ruleId": "CR0094_T1021_T1039",
+    "ruleName": "Anomalous RDP Session with Drives Redirection",
+    "ruleFormat": "IR_v1",
+    "ruleType": "THRESHOLD",
+    "ruleOrigin": "custom",
+    "description": "Detects RDP session establishment followed by file creation events originating from a redirected tsclient drive on the target host within 30 minutes.",
+    "enabled": true,
+    "version": 1,
+    "correlationKey": "entity_key",
+    "eventSources": [
+      "zeek",
+      "windows_sysmon"
+    ],
+    "window": {
+      "type": "sliding",
+      "minSpanSeconds": 0,
+      "durationSeconds": 1800
+    },
+    "output": {
+      "tags": [
+        "atomic-red-team",
+        "bzar"
+      ],
+      "message": "Potential RDP lateral drive redirection file transfer detected on host",
+      "severity": "HIGH",
+      "entityField": "host.name",
+      "mitreTactics": [
+        "TA0008",
+        "TA0009"
+      ],
+      "includeFields": [],
+      "riskScoreDelta": 4,
+      "mitreTechniques": [
+        "T1021.001",
+        "T1039"
+      ]
+    },
+    "stages": [
+      {
+        "stageIndex": 0,
+        "match": {
+          "groups": [
+            {
+              "groups": [],
+              "operator": "OR",
+              "conditions": [
+                {
+                  "field": "signature_name",
+                  "value": "RDP connection",
+                  "values": [],
+                  "operator": "contains"
+                },
+                {
+                  "field": "signature_name",
+                  "value": "RDP session established",
+                  "values": [],
+                  "operator": "contains"
+                }
+              ]
+            }
+          ],
+          "operator": "AND",
+          "conditions": [
+            {
+              "field": "dest_port",
+              "value": "3389",
+              "values": [],
+              "operator": "equals"
+            },
+            {
+              "field": "entity_key_direction",
+              "value": "target",
+              "values": [],
+              "operator": "equals"
+            }
+          ]
+        },
+        "minGapMs": 0,
+        "aggregate": {
+          "field": null,
+          "groupBy": [
+            "host.name"
+          ],
+          "function": "count",
+          "threshold": 1,
+          "distinctField": null
+        },
+        "eventSources": [
+          "zeek"
+        ],
+        "withinSeconds": 0,
+        "minOccurrences": 0,
+        "correlation_key": "host.name",
+        "minDistinctCount": 0,
+        "requireDistinctField": null,
+        "excludeSignatureContains": []
+      },
+      {
+        "stageIndex": 1,
+        "match": {
+          "groups": [
+            {
+              "groups": [],
+              "operator": "AND",
+              "conditions": [
+                {
+                  "field": "signature_name",
+                  "value": "File Created",
+                  "values": [],
+                  "operator": "contains"
+                },
+                {
+                  "field": "file_path",
+                  "value": "tsclient",
+                  "values": [],
+                  "operator": "contains"
+                },
+                {
+                  "field": "file_extension",
+                  "value": ".exe",
+                  "values": [
+                    ".exe",
+                    ".dll",
+                    ".sys",
+                    ".ps1",
+                    ".bat",
+                    ".com",
+                    ".scr",
+                    ".vbs"
+                  ],
+                  "operator": "in"
+                }
+              ]
+            }
+          ],
+          "operator": "AND",
+          "conditions": []
+        },
+        "minGapMs": 0,
+        "aggregate": {
+          "field": null,
+          "groupBy": [
+            "host.name"
+          ],
+          "function": "count",
+          "threshold": 1,
+          "distinctField": null
+        },
+        "eventSources": [
+          "windows_sysmon"
+        ],
+        "withinSeconds": 1800,
+        "minOccurrences": 0,
+        "correlation_key": "host.name",
+        "minDistinctCount": 0,
+        "requireDistinctField": null,
+        "excludeSignatureContains": []
+      }
+    ],
+    "suppression": {
+      "groupBy": [
+        "host.name"
+      ],
+      "durationSeconds": 300
+    },
+    "maxGapSeconds": 1800,
+    "behavioralConstraints": null,
+    "maxConcurrentInstances": 0
+  },
+  {
+    "ruleId": "CR0095_T1563_T1078",
+    "ruleName": "Administrative RDP Session Hijacking via tscon.exe",
+    "ruleFormat": "IR_v1",
+    "ruleType": "THRESHOLD",
+    "ruleOrigin": "custom",
+    "description": "Detects RDP protocol activity followed by command execution of tscon.exe under SYSTEM privileges on the target host within 30 minutes.",
+    "enabled": true,
+    "version": 1,
+    "correlationKey": "entity_key",
+    "eventSources": [
+      "zeek",
+      "windows_sysmon"
+    ],
+    "window": {
+      "type": "sliding",
+      "minSpanSeconds": 0,
+      "durationSeconds": 1800
+    },
+    "output": {
+      "tags": [
+        "atomic-red-team",
+        "bzar"
+      ],
+      "message": "Potential RDP session hijacking attempt via tscon execution by SYSTEM detected",
+      "severity": "HIGH",
+      "entityField": "host.name",
+      "mitreTactics": [
+        "TA0008",
+        "TA0004"
+      ],
+      "includeFields": [],
+      "riskScoreDelta": 4,
+      "mitreTechniques": [
+        "T1563.002",
+        "T1078"
+      ]
+    },
+    "stages": [
+      {
+        "stageIndex": 0,
+        "match": {
+          "groups": [
+            {
+              "groups": [],
+              "operator": "OR",
+              "conditions": [
+                {
+                  "field": "signature_name",
+                  "value": "RDP connection",
+                  "values": [],
+                  "operator": "contains"
+                },
+                {
+                  "field": "signature_name",
+                  "value": "RDP session established",
+                  "values": [],
+                  "operator": "contains"
+                }
+              ]
+            }
+          ],
+          "operator": "AND",
+          "conditions": []
+        },
+        "minGapMs": 0,
+        "aggregate": {
+          "field": null,
+          "groupBy": [],
+          "function": "count",
+          "threshold": 1,
+          "distinctField": null
+        },
+        "eventSources": [
+          "zeek"
+        ],
+        "withinSeconds": 0,
+        "minOccurrences": 0,
+        "correlation_key": "host.name",
+        "minDistinctCount": 0,
+        "requireDistinctField": null,
+        "excludeSignatureContains": []
+      },
+      {
+        "stageIndex": 1,
+        "match": {
+          "groups": [
+            {
+              "groups": [],
+              "operator": "AND",
+              "conditions": [
+                {
+                  "field": "signature_name",
+                  "value": "tscon",
+                  "values": [],
+                  "operator": "contains"
+                },
+                {
+                  "field": "user",
+                  "value": "SYSTEM",
+                  "values": [],
+                  "operator": "equals"
+                }
+              ]
+            }
+          ],
+          "operator": "AND",
+          "conditions": []
+        },
+        "minGapMs": 0,
+        "aggregate": {
+          "field": null,
+          "groupBy": [],
+          "function": "count",
+          "threshold": 1,
+          "distinctField": null
+        },
+        "eventSources": [
+          "windows_sysmon"
+        ],
+        "withinSeconds": 1800,
+        "minOccurrences": 0,
+        "correlation_key": "host.name",
+        "minDistinctCount": 0,
+        "requireDistinctField": null,
+        "excludeSignatureContains": []
+      }
+    ],
+    "suppression": {
+      "groupBy": [
+        "host.name"
+      ],
+      "durationSeconds": 300
+    },
+    "maxGapSeconds": 0,
+    "behavioralConstraints": null,
+    "maxConcurrentInstances": 0
+  },
+  {
+    "ruleId": "CR0096_T1021_T1547",
+    "ruleName": "Remote Registry Modification for Auto-Run Persistence",
+    "ruleFormat": "IR_v1",
+    "ruleType": "THRESHOLD",
+    "ruleOrigin": "custom",
+    "description": "Detects RPC connection to Remote Registry service followed by Sysmon Registry Event modifying remote run keys within 15 minutes.",
+    "enabled": true,
+    "version": 1,
+    "correlationKey": "entity_key",
+    "eventSources": [
+      "zeek",
+      "windows_sysmon"
+    ],
+    "window": {
+      "type": "sliding",
+      "minSpanSeconds": 0,
+      "durationSeconds": 900
+    },
+    "output": {
+      "tags": [
+        "atomic-red-team",
+        "bzar"
+      ],
+      "message": "Remote Registry connection followed by auto-run persistence modification detected",
+      "severity": "MEDIUM",
+      "entityField": "host.name",
+      "mitreTactics": [
+        "TA0008",
+        "TA0003"
+      ],
+      "includeFields": [],
+      "riskScoreDelta": 3,
+      "mitreTechniques": [
+        "T1021",
+        "T1547.001"
+      ]
+    },
+    "stages": [
+      {
+        "stageIndex": 0,
+        "match": {
+          "groups": [
+            {
+              "groups": [],
+              "operator": "OR",
+              "conditions": [
+                {
+                  "field": "rpc_endpoint",
+                  "value": "\\pipe\\winreg",
+                  "values": [],
+                  "operator": "equals"
+                },
+                {
+                  "field": "rpc_uuid",
+                  "value": "338cd001-2244-31f1-aaaa-900038001003",
+                  "values": [],
+                  "operator": "equals"
+                },
+                {
+                  "field": "signature_name",
+                  "value": "Remote Registry access",
+                  "values": [],
+                  "operator": "contains"
+                }
+              ]
+            }
+          ],
+          "operator": "AND",
+          "conditions": []
+        },
+        "minGapMs": 0,
+        "aggregate": {
+          "field": null,
+          "groupBy": [],
+          "function": "count",
+          "threshold": 1,
+          "distinctField": null
+        },
+        "eventSources": [
+          "zeek"
+        ],
+        "withinSeconds": 0,
+        "minOccurrences": 0,
+        "correlation_key": "host.name",
+        "minDistinctCount": 0,
+        "requireDistinctField": null,
+        "excludeSignatureContains": []
+      },
+      {
+        "stageIndex": 1,
+        "match": {
+          "groups": [
+            {
+              "groups": [
+                {
+                  "groups": [],
+                  "operator": "OR",
+                  "conditions": [
+                    {
+                      "field": "registry_key_path",
+                      "value": "CurrentVersion\\Run",
+                      "values": [],
+                      "operator": "contains"
+                    },
+                    {
+                      "field": "registry_key_path",
+                      "value": "CurrentVersion\\RunOnce",
+                      "values": [],
+                      "operator": "contains"
+                    }
+                  ]
+                }
+              ],
+              "operator": "AND",
+              "conditions": [
+                {
+                  "field": "signature_name",
+                  "value": "Registry value set",
+                  "values": [],
+                  "operator": "contains"
+                }
+              ]
+            }
+          ],
+          "operator": "AND",
+          "conditions": []
+        },
+        "minGapMs": 0,
+        "aggregate": {
+          "field": null,
+          "groupBy": [],
+          "function": "count",
+          "threshold": 1,
+          "distinctField": null
+        },
+        "eventSources": [
+          "windows_sysmon"
+        ],
+        "withinSeconds": 900,
+        "minOccurrences": 0,
+        "correlation_key": "host.name",
+        "minDistinctCount": 0,
+        "requireDistinctField": null,
+        "excludeSignatureContains": []
+      }
+    ],
+    "suppression": {
+      "groupBy": [
+        "host.name"
+      ],
+      "durationSeconds": 300
+    },
+    "maxGapSeconds": 0,
+    "behavioralConstraints": null,
+    "maxConcurrentInstances": 0
+  },
+  {
+    "ruleId": "CR0097_T1021_T1204",
+    "ruleName": "DCOM Remote Execution via Excel.Application Object",
+    "ruleFormat": "IR_v1",
+    "ruleType": "THRESHOLD",
+    "ruleOrigin": "custom",
+    "description": "Detects RPC traffic followed by excel.exe spawning cmd.exe or powershell.exe on the target host within 15 minutes.",
+    "enabled": true,
+    "version": 1,
+    "correlationKey": "entity_key",
+    "eventSources": [
+      "zeek",
+      "windows_sysmon"
+    ],
+    "window": {
+      "type": "sliding",
+      "minSpanSeconds": 0,
+      "durationSeconds": 900
+    },
+    "output": {
+      "tags": [
+        "atomic-red-team",
+        "bzar"
+      ],
+      "message": "DCOM RPC connection followed by excel.exe spawning command shell detected",
+      "severity": "MEDIUM",
+      "entityField": "host.name",
+      "mitreTactics": [
+        "TA0008",
+        "TA0002"
+      ],
+      "includeFields": [],
+      "riskScoreDelta": 3,
+      "mitreTechniques": [
+        "T1021.003"
+      ]
+    },
+    "stages": [
+      {
+        "stageIndex": 0,
+        "match": {
+          "groups": [
+            {
+              "groups": [],
+              "operator": "OR",
+              "conditions": [
+                {
+                  "field": "signature_name",
+                  "value": "RPC traffic",
+                  "values": [],
+                  "operator": "contains"
+                },
+                {
+                  "field": "signature_name",
+                  "value": "DCOM connection established",
+                  "values": [],
+                  "operator": "contains"
+                }
+              ]
+            }
+          ],
+          "operator": "AND",
+          "conditions": [
+            {
+              "field": "dest_port",
+              "value": "135",
+              "values": [],
+              "operator": "equals"
+            },
+            {
+              "field": "entity_key_direction",
+              "value": "target",
+              "values": [],
+              "operator": "equals"
+            }
+          ]
+        },
+        "minGapMs": 0,
+        "aggregate": {
+          "field": null,
+          "groupBy": [
+            "host.name"
+          ],
+          "function": "count",
+          "threshold": 1,
+          "distinctField": null
+        },
+        "eventSources": [
+          "zeek"
+        ],
+        "withinSeconds": 0,
+        "minOccurrences": 0,
+        "correlation_key": "host.name",
+        "minDistinctCount": 0,
+        "requireDistinctField": null,
+        "excludeSignatureContains": []
+      },
+      {
+        "stageIndex": 1,
+        "match": {
+          "groups": [
+            {
+              "groups": [],
+              "operator": "OR",
+              "conditions": [
+                {
+                  "field": "process_name",
+                  "value": "cmd.exe",
+                  "values": [
+                    "cmd.exe",
+                    "powershell.exe",
+                    "pwsh.exe",
+                    "cscript.exe",
+                    "wscript.exe"
+                  ],
+                  "operator": "in"
+                }
+              ]
+            }
+          ],
+          "operator": "AND",
+          "conditions": [
+            {
+              "field": "parent_process_name",
+              "value": "excel.exe",
+              "values": [],
+              "operator": "equals"
+            }
+          ]
+        },
+        "minGapMs": 0,
+        "aggregate": {
+          "field": null,
+          "groupBy": [
+            "host.name"
+          ],
+          "function": "count",
+          "threshold": 1,
+          "distinctField": null
+        },
+        "eventSources": [
+          "windows_sysmon"
+        ],
+        "withinSeconds": 900,
+        "minOccurrences": 0,
+        "correlation_key": "host.name",
+        "minDistinctCount": 0,
+        "requireDistinctField": null,
+        "excludeSignatureContains": []
+      }
+    ],
+    "suppression": {
+      "groupBy": [
+        "host.name"
+      ],
+      "durationSeconds": 300
+    },
+    "maxGapSeconds": 900,
+    "behavioralConstraints": null,
+    "maxConcurrentInstances": 0
+  },
+  {
+    "ruleId": "CR0098_T1021_T1105",
+    "ruleName": "Inbound SMB Share Mapping followed by File Download",
+    "ruleFormat": "IR_v1",
+    "ruleType": "THRESHOLD",
+    "ruleOrigin": "custom",
+    "description": "Detects remote SMB share mapping followed by downloading files from external source within 15 minutes.",
+    "enabled": true,
+    "version": 1,
+    "correlationKey": "entity_key",
+    "eventSources": [
+      "zeek",
+      "windows_sysmon"
+    ],
+    "window": {
+      "type": "sliding",
+      "minSpanSeconds": 0,
+      "durationSeconds": 900
+    },
+    "output": {
+      "tags": [
+        "atomic-red-team",
+        "bzar"
+      ],
+      "message": "SMB share mapped followed by potential malicious file download detected",
+      "severity": "MEDIUM",
+      "entityField": "host.name",
+      "mitreTactics": [
+        "TA0008",
+        "TA0009"
+      ],
+      "includeFields": [],
+      "riskScoreDelta": 3,
+      "mitreTechniques": [
+        "T1021.002",
+        "T1105"
+      ]
+    },
+    "stages": [
+      {
+        "stageIndex": 0,
+        "match": {
+          "groups": [
+            {
+              "groups": [],
+              "operator": "OR",
+              "conditions": [
+                {
+                  "field": "signature_name",
+                  "value": "SMB tree connect",
+                  "values": [],
+                  "operator": "contains"
+                },
+                {
+                  "field": "signature_name",
+                  "value": "SMB share mapped",
+                  "values": [],
+                  "operator": "contains"
+                }
+              ]
+            }
+          ],
+          "operator": "AND",
+          "conditions": [
+            {
+              "field": "dest_port",
+              "value": "445",
+              "values": [],
+              "operator": "equals"
+            },
+            {
+              "field": "entity_key_direction",
+              "value": "target",
+              "values": [],
+              "operator": "equals"
+            }
+          ]
+        },
+        "minGapMs": 0,
+        "aggregate": {
+          "field": null,
+          "groupBy": [
+            "host.name"
+          ],
+          "function": "count",
+          "threshold": 1,
+          "distinctField": null
+        },
+        "eventSources": [
+          "zeek"
+        ],
+        "withinSeconds": 0,
+        "minOccurrences": 0,
+        "correlation_key": "host.name",
+        "minDistinctCount": 0,
+        "requireDistinctField": null,
+        "excludeSignatureContains": []
+      },
+      {
+        "stageIndex": 1,
+        "match": {
+          "groups": [
+            {
+              "groups": [],
+              "operator": "AND",
+              "conditions": [
+                {
+                  "field": "signature_name",
+                  "value": "File Created",
+                  "values": [],
+                  "operator": "contains"
+                },
+                {
+                  "field": "file_path",
+                  "value": "\\\\",
+                  "values": [],
+                  "operator": "contains"
+                },
+                {
+                  "field": "file_extension",
+                  "value": ".exe",
+                  "values": [
+                    ".exe",
+                    ".dll",
+                    ".sys",
+                    ".ps1",
+                    ".bat",
+                    ".com",
+                    ".scr",
+                    ".vbs",
+                    ".msi"
+                  ],
+                  "operator": "in"
+                }
+              ]
+            }
+          ],
+          "operator": "AND",
+          "conditions": []
+        },
+        "minGapMs": 0,
+        "aggregate": {
+          "field": null,
+          "groupBy": [
+            "host.name"
+          ],
+          "function": "count",
+          "threshold": 1,
+          "distinctField": null
+        },
+        "eventSources": [
+          "windows_sysmon"
+        ],
+        "withinSeconds": 900,
+        "minOccurrences": 0,
+        "correlation_key": "host.name",
+        "minDistinctCount": 0,
+        "requireDistinctField": null,
+        "excludeSignatureContains": []
+      }
+    ],
+    "suppression": {
+      "groupBy": [
+        "host.name"
+      ],
+      "durationSeconds": 300
+    },
+    "maxGapSeconds": 900,
+    "behavioralConstraints": null,
+    "maxConcurrentInstances": 0
+  },
+  {
+    "ruleId": "CR0099_T1021_T1059",
+    "ruleName": "Remote PowerShell Session over SSH",
+    "ruleFormat": "IR_v1",
+    "ruleType": "THRESHOLD",
+    "ruleOrigin": "custom",
+    "description": "Detects SSH connection followed by pwsh.exe or powershell.exe launching interactive sessions under sshd.exe parent within 15 minutes.",
+    "enabled": true,
+    "version": 1,
+    "correlationKey": "entity_key",
+    "eventSources": [
+      "zeek",
+      "windows_sysmon"
+    ],
+    "window": {
+      "type": "sliding",
+      "minSpanSeconds": 0,
+      "durationSeconds": 900
+    },
+    "output": {
+      "tags": [
+        "atomic-red-team",
+        "bzar"
+      ],
+      "message": "PowerShell remoting session spawned under local sshd.exe process detected",
+      "severity": "MEDIUM",
+      "entityField": "host.name",
+      "mitreTactics": [
+        "TA0008",
+        "TA0002"
+      ],
+      "includeFields": [],
+      "riskScoreDelta": 3,
+      "mitreTechniques": [
+        "T1021.004",
+        "T1059.001"
+      ]
+    },
+    "stages": [
+      {
+        "stageIndex": 0,
+        "match": {
+          "groups": [
+            {
+              "groups": [],
+              "operator": "OR",
+              "conditions": [
+                {
+                  "field": "signature_name",
+                  "value": "SSH connection",
+                  "values": [],
+                  "operator": "contains"
+                },
+                {
+                  "field": "signature_name",
+                  "value": "SSH tunnel established",
+                  "values": [],
+                  "operator": "contains"
+                }
+              ]
+            }
+          ],
+          "operator": "AND",
+          "conditions": [
+            {
+              "field": "entity_key_direction",
+              "value": "target",
+              "values": [],
+              "operator": "equals"
+            },
+            {
+              "field": "source_ip",
+              "value": "10.1.10.0/24",
+              "values": [
+                "10.1.10.0/24"
+              ],
+              "operator": "not_in"
+            }
+          ]
+        },
+        "minGapMs": 0,
+        "aggregate": {
+          "field": null,
+          "groupBy": [
+            "host.name"
+          ],
+          "function": "count",
+          "threshold": 1,
+          "distinctField": null
+        },
+        "eventSources": [
+          "zeek"
+        ],
+        "withinSeconds": 0,
+        "minOccurrences": 0,
+        "correlation_key": "host.name",
+        "minDistinctCount": 0,
+        "requireDistinctField": null,
+        "excludeSignatureContains": []
+      },
+      {
+        "stageIndex": 1,
+        "match": {
+          "groups": [
+            {
+              "groups": [],
+              "operator": "OR",
+              "conditions": [
+                {
+                  "field": "process_name",
+                  "value": "powershell.exe",
+                  "values": [],
+                  "operator": "equals"
+                },
+                {
+                  "field": "process_name",
+                  "value": "pwsh.exe",
+                  "values": [],
+                  "operator": "equals"
+                },
+                {
+                  "field": "signature_name",
+                  "value": "powershell",
+                  "values": [],
+                  "operator": "contains"
+                }
+              ]
+            }
+          ],
+          "operator": "AND",
+          "conditions": [
+            {
+              "field": "parent_process_name",
+              "value": "sshd.exe",
+              "values": [],
+              "operator": "equals"
+            }
+          ]
+        },
+        "minGapMs": 0,
+        "aggregate": {
+          "field": null,
+          "groupBy": [
+            "host.name"
+          ],
+          "function": "count",
+          "threshold": 1,
+          "distinctField": null
+        },
+        "eventSources": [
+          "windows_sysmon"
+        ],
+        "withinSeconds": 900,
+        "minOccurrences": 0,
+        "correlation_key": "host.name",
+        "minDistinctCount": 0,
+        "requireDistinctField": null,
+        "excludeSignatureContains": []
+      }
+    ],
+    "suppression": {
+      "groupBy": [
+        "host.name"
+      ],
+      "durationSeconds": 300
+    },
+    "maxGapSeconds": 900,
+    "behavioralConstraints": null,
+    "maxConcurrentInstances": 0
+  },
+  {
+    "ruleId": "CR0113_T1021_T1003",
+    "ruleName": "Loopback RDP Logon followed by LSASS dumping",
+    "ruleFormat": "IR_v1",
+    "ruleType": "THRESHOLD",
+    "ruleOrigin": "custom",
+    "description": "Detects local loopback RDP logon followed by LSASS memory access within 30 minutes, indicating potential credential harvesting via forwarded ports.",
+    "enabled": true,
+    "version": 1,
+    "correlationKey": "entity_key",
+    "eventSources": [
+      "windows_sysmon"
+    ],
+    "window": {
+      "type": "sliding",
+      "minSpanSeconds": 0,
+      "durationSeconds": 1800
+    },
+    "output": {
+      "tags": [
+        "atomic-red-team",
+        "mitre-attack"
+      ],
+      "message": "Potential loopback RDP logon and LSASS dumping credential extraction on host",
+      "severity": "HIGH",
+      "entityField": "host.name",
+      "mitreTactics": [
+        "TA0008",
+        "TA0006",
+        "TA0011"
+      ],
+      "includeFields": [],
+      "riskScoreDelta": 4,
+      "mitreTechniques": [
+        "T1021.001",
+        "T1003.001",
+        "T1572"
+      ]
+    },
+    "stages": [
+      {
+        "stageIndex": 0,
+        "match": {
+          "groups": [
+            {
+              "groups": [],
+              "operator": "AND",
+              "conditions": [
+                {
+                  "field": "signature_name",
+                  "value": "Successful Logon",
+                  "values": [],
+                  "operator": "contains"
+                },
+                {
+                  "field": "source_ip",
+                  "value": "127.0.0.1",
+                  "values": [
+                    "127.0.0.1",
+                    "::1"
+                  ],
+                  "operator": "in"
+                },
+                {
+                  "field": "logon_type",
+                  "value": "10",
+                  "values": [
+                    "3",
+                    "10"
+                  ],
+                  "operator": "in"
+                }
+              ]
+            }
+          ],
+          "operator": "AND",
+          "conditions": []
+        },
+        "minGapMs": 0,
+        "aggregate": {
+          "field": null,
+          "groupBy": [],
+          "function": "count",
+          "threshold": 1,
+          "distinctField": null
+        },
+        "eventSources": [
+          "windows_sysmon"
+        ],
+        "withinSeconds": 0,
+        "minOccurrences": 0,
+        "correlation_key": "host.name",
+        "minDistinctCount": 0,
+        "requireDistinctField": null,
+        "excludeSignatureContains": []
+      },
+      {
+        "stageIndex": 1,
+        "match": {
+          "groups": [
+            {
+              "groups": [],
+              "operator": "OR",
+              "conditions": [
+                {
+                  "field": "signature_name",
+                  "value": "LSASS process access",
+                  "values": [],
+                  "operator": "contains"
+                },
+                {
+                  "field": "target_process_name",
+                  "value": "lsass.exe",
+                  "values": [],
+                  "operator": "equals"
+                }
+              ]
+            }
+          ],
+          "operator": "AND",
+          "conditions": [
+            {
+              "field": "granted_access",
+              "value": "0x1010",
+              "values": [],
+              "operator": "contains"
+            }
+          ]
+        },
+        "minGapMs": 0,
+        "aggregate": {
+          "field": null,
+          "groupBy": [],
+          "function": "count",
+          "threshold": 1,
+          "distinctField": null
+        },
+        "eventSources": [
+          "windows_sysmon"
+        ],
+        "withinSeconds": 1800,
+        "minOccurrences": 0,
+        "correlation_key": "host.name",
+        "minDistinctCount": 0,
+        "requireDistinctField": null,
+        "excludeSignatureContains": []
+      }
+    ],
+    "suppression": {
+      "groupBy": [
+        "host.name"
+      ],
+      "durationSeconds": 300
+    },
+    "maxGapSeconds": 0,
+    "behavioralConstraints": null,
+    "maxConcurrentInstances": 0
+  }
+]

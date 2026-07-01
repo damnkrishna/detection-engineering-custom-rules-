@@ -1,0 +1,60 @@
+# Executive Log Source Verification Summary
+## Red Team Testing Readiness Reference
+
+> **Purpose:** This high-level summary lists only the critical log sources, system configurations, and event channels that the SOC/infrastructure team must verify are active and forwarding to the SIEM **before** the red team begins testing. 
+
+---
+
+## 1. Critical Windows OS Settings (GPO)
+Ensure these three configurations are enabled via Group Policy on all target Windows machines. Without these, process command lines and PowerShell scripts will show up blank in the SIEM:
+
+*   **Command Line Auditing (Process Creation):**
+    *   *Path:* Computer Configuration > Admin Templates > System > Audit Process Creation
+    *   *Setting:* Set **Include command line in process creation events** to **Enabled**.
+*   **PowerShell Script Block Logging:**
+    *   *Path:* Computer Configuration > Admin Templates > Windows Components > Windows PowerShell
+    *   *Setting:* Set **Turn on PowerShell Script Block Logging** to **Enabled** (generates Event ID 4104).
+
+---
+
+## 2. Windows Event Channels to Ingest
+Verify the following log channels are actively forwarding to the SIEM:
+
+| Event Log Channel | Key Event IDs | Used For |
+|---|---|---|
+| **Security** | `4624`, `4625`, `4648`, `4688`, `4738`, `4768`, `4769` | Remote logons, local process creation, privilege use, user account changes. |
+| **System** | `7045`, `7036` | Dynamic Windows service creations (e.g. PsExec lateral movement). |
+| **PowerShell/Operational** | **`4104`** | Obfuscated script execution, credential dumping cmdlets, WMI scripts. |
+| **WMI-Activity/Operational** | `5861` | WMI persistence event consumer registrations. |
+
+---
+
+## 3. Sysmon Configuration (Critical Event IDs)
+Verify your Sysmon agent configuration permits and forwards the following Event IDs. Exclude filters must not block standard red team test paths (like `%TEMP%` or `C:\Users\Public\`):
+
+| Sysmon Event ID | Schema Category | Detects |
+|---|---|---|
+| **EID 1** | `process_creation` | LOLBin execution, binary renaming, network share enumerations, Discovery cmdlets. |
+| **EID 3** | `network_connection` | Inbound SSH reverse shells, LLMNR/NBT-NS binding, outgoing beaconing connections. |
+| **EID 7** | `image_load` | Memory injection DLL loads, keylogger libraries, LSASS hooking. |
+| **EID 8** | `create_remote_thread` | Memory injection chains. |
+| **EID 10** | `process_access` | LSASS memory access, credential dumping. |
+| **EID 11** | `file_event` | Web shell writes, malicious installers dropping payloads. |
+| **EID 12 & 13** | `registry_event` | Registry run keys, MFA tampering, keyboard layout modifications. |
+| **EID 22** | `dns_query` | DNS queries (essential for DNS Tunneling correlation rules). |
+
+---
+
+## 4. Network and External Sensors
+If the red team is testing network-level or external tactics, these logs must also be ingested:
+
+*   **IIS / Web Server Access Logs:** Required to detect web directory scans, path discovery, and web shell interactions.
+*   **Web Proxy / WAF Logs:** Required to detect GenAI data leakages and external scanning.
+*   **Mail Gateway Logs:** Required to detect inbound phishing for information.
+
+---
+
+### Quick Verification Check (for SOC Analyst):
+1. Run `sc query sysmon64` on a target machine to confirm Sysmon is running.
+2. Run `Get-WinEvent -LogName "Microsoft-Windows-PowerShell/Operational" -MaxEvents 5` to confirm Script Block Logging is active.
+3. In the SIEM console, run a query to verify you are receiving Sysmon Event ID 10 and PowerShell Event ID 4104 within the last 5 minutes.
