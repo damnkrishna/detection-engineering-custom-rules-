@@ -1,7 +1,7 @@
 ==========================================================================================
   SESSION RULES SUMMARY — ALL NEW DETECTION RULES WRITTEN
   Generated : 2026-07-01
-  Total     : 41 rules  (AN2067 – AN2107)
+  Total     : 61 rules  (AN2067 – AN2107)
 ==========================================================================================
 
 ──────────────────────────────────────────────────────────────────────────────────────────
@@ -19,7 +19,29 @@
   8    AN2074     DET0931    T1681    Reconnaissance       low      OSINT-ONLY (NO SIGMA BY DESIGN)
   9    AN2075     DET0932    T1682    Reconnaissance       medium   Outbound Data Upload to Public GenAI Services
 
-  Subtotal: 9 rules
+  10   AN2069-WBS DET0926.1  T1505.003 Reconnaissance       high     Suspicious Process Spawning from Web Server Parent
+  11   AN2069-WBF DET0926.2  T1505.003 Reconnaissance       high     Web Shell File Creation
+  12   AN2069-CDN DET0926.3  T1594    Reconnaissance       low      Web Path Discovery in CDN Access Logs
+  13   AN2069-FZA DET0926.4  T1594    Reconnaissance       high     Web Fuzzing Tool User-Agent Detection
+  14   AN2069-ERR DET0926.5  T1594    Reconnaissance       low      Anomalous HTTP Error Rate from Single Source
+  15   AN2069-DNS DET0926.6  T1590    Reconnaissance       low      DNS NXDOMAIN Spike from External Source
+  16   AN2069-HST DET0926.7  T1594    Reconnaissance       low      Access to Deprecated or Historical Endpoint Patterns
+  17   AN2069-SNS DET0926.8  T1594    Reconnaissance       high     Exposure File Access
+  18   AN2069-RBT DET0926.9  T1594    Reconnaissance       low      Reconnaissance via robots.txt and Sitemap Access
+  19   AN2069-SLW DET0926.10 T1594    Reconnaissance       medium   Sustained Low-Rate Web Recon
+  20   AN2069-COR DET0926.11 T1594    Reconnaissance       critical Web Reconnaissance Followed by Web Shell Execution
+  21   AN2070-FST DET0927.1  T1595    Reconnaissance       high     Fast External Port Scanning Detection
+  22   AN2070-SLW DET0927.2  T1595    Reconnaissance       medium   Low-and-Slow Active Scanning
+  23   AN2070-DST DET0927.3  T1595    Reconnaissance       high     Distributed External Port Scanning
+  24   AN2070-UDP DET0927.4  T1595    Reconnaissance       high     UDP Port Scanning Detection
+  25   AN2070-PSC DET0927.5  T1190    Reconnaissance       low      Successful Inbound Connection Post-Scan
+  26   AN2070-COR DET0927.6  T1595    Reconnaissance       critical Port Scan Followed by Active Connection and Command Execution
+
+  13   AN2067-PSB DET0924.1  T1592    Reconnaissance       medium   PowerShell System Information Gathering Burst
+  14   AN2067-RGB DET0924.2  T1592    Reconnaissance       medium   Registry System Information Query Burst
+  15   AN2067-WMB DET0924.3  T1592    Reconnaissance       medium   WMI Command Line System Information Gathering Burst
+
+  Subtotal: 29 rules
 
 ──────────────────────────────────────────────────────────────────────────────────────────
   DISCOVERY SPRINT 1 (AN2076-AN2086)

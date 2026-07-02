@@ -5940,7 +5940,7 @@ tags:
     - attack.t1592
     - analytic.an2067
     - detection.det0924
----
+
 title: PowerShell System Information Gathering via WMI/CIM (AN2067-PowerShell)
 id: dcb5c6d7-e8f9-4a0b-b1c2-d3e4f5a6b7c8
 status: experimental
@@ -5963,14 +5963,14 @@ detection:
             - 'Win32_ComputerSystem'
             - 'Win32_BIOS'
             - 'Win32_Processor'
-    condition: selection_cmdlet and selection_classes | count() by Computer > 3 in 5m
+    condition: selection_cmdlet and selection_classes
 falsepositives:
     - Legitimate administrative system auditing or inventory scripts.
-level: medium
+level: low
 tags:
     - attack.reconnaissance
     - attack.t1592
----
+
 title: Registry System Information Query (AN2067-Registry)
 id: a1b2c3d4-4b5c-6d7e-8f9a-0b1c2d3e4f5a
 status: experimental
@@ -5992,14 +5992,14 @@ detection:
             - 'HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion'
             - 'HKLM\SYSTEM\CurrentControlSet\Control\ComputerName'
             - 'HKLM\Hardware\Description\System\CentralProcessor'
-    condition: selection_reg and selection_args and selection_keys | count() by Computer > 3 in 5m
+    condition: selection_reg and selection_args and selection_keys
 falsepositives:
     - Legitimate diagnostic scripts.
 level: low
 tags:
     - attack.reconnaissance
     - attack.t1592
----
+
 title: WMI Command Line System Information Gathering (AN2067-WMIC)
 id: f5a6b7c8-d9e0-1a2b-3c4d-5e6f7a8b9c0d
 status: experimental
@@ -6023,18 +6023,107 @@ detection:
         CommandLine|contains:
             - 'get'
             - 'list'
-    condition: selection_wmic and selection_args and selection_action | count() by Computer > 3 in 5m
+    condition: selection_wmic and selection_args and selection_action
 falsepositives:
     - Third-party inventory management tools or automated domain setup scripts.
+level: low
+tags:
+    - attack.reconnaissance
+    - attack.t1592
+
+title: PowerShell System Information Gathering Burst (AN2067-PowerShell-Burst)
+id: dcb5c6d7-e8f9-4a0b-b1c2-d3e4f5a6b7c9
+status: experimental
+description: Detects multiple PowerShell script block logs executing WMI or CIM queries targeting system specifications classes in a short timeframe.
+correlation:
+    type: event_count
+    rules:
+        - dcb5c6d7-e8f9-4a0b-b1c2-d3e4f5a6b7c8 # AN2067-PowerShell
+    group-by: Computer
+    timespan: 5m
+    condition:
+        gte: 4
 level: medium
 tags:
     - attack.reconnaissance
     - attack.t1592
----
+
+title: Registry System Information Query Burst (AN2067-Registry-Burst)
+id: a1b2c3d4-4b5c-6d7e-8f9a-0b1c2d3e4f5b
+status: experimental
+description: Detects multiple command-line executions of reg.exe querying key system information registry paths in a short timeframe.
+correlation:
+    type: event_count
+    rules:
+        - a1b2c3d4-4b5c-6d7e-8f9a-0b1c2d3e4f5a # AN2067-Registry
+    group-by: Computer
+    timespan: 5m
+    condition:
+        gte: 4
+level: medium
+tags:
+    - attack.reconnaissance
+    - attack.t1592
+
+title: WMI Command Line System Information Gathering Burst (AN2067-WMIC-Burst)
+id: f5a6b7c8-d9e0-1a2b-3c4d-5e6f7a8b9c0e
+status: experimental
+description: Detects multiple executions of wmic.exe targeting classes that describe system specs in a short timeframe.
+correlation:
+    type: event_count
+    rules:
+        - f5a6b7c8-d9e0-1a2b-3c4d-5e6f7a8b9c0d # AN2067-WMIC
+    group-by: Computer
+    timespan: 5m
+    condition:
+        gte: 4
+level: medium
+tags:
+    - attack.reconnaissance
+    - attack.t1592
+
+title: Sequential Host Discovery Utilities Execution (AN2067-Correlation)
+id: c3d4e5f6-7a8b-9c0d-1e2f-3a4b5c6d7e8f
+status: experimental
+description: Detects when multiple distinct host discovery utilities (systeminfo, dxdiag, gpresult) are executed on the same host within a short window (5 minutes), indicating sequential post-compromise system profiling.
+correlation:
+    type: temporal
+    rules:
+        - rule_1: Suspicious System Information Gathering (AN2067)
+    group-by:
+        - Computer
+        - User
+    timespan: 5m
+    condition: rule_1|count(Image) >= 2 and distinct(Image) >= 2
+level: high
+tags:
+    - attack.reconnaissance
+    - attack.t1592
+
+title: Host Discovery Followed by Lateral Movement Setup (AN2067-PostDiscovery)
+id: e5f6a7b8-9c0d-1a2b-3c4d-5e6f7a8b9c0d
+status: experimental
+description: Detects when host discovery correlation is followed by lateral movement (psexec.exe, net.exe remote connections) or persistence (service account creation) within 10 minutes on the same system.
+correlation:
+    type: temporal
+    rules:
+        - rule_1: Sequential Host Discovery Utilities Execution (AN2067-Correlation)
+        - rule_2: Windows Local/Service Account Creation (EventID 4720) or Suspicious Execution (net.exe, psexec.exe)
+    group-by:
+        - Computer
+    timespan: 10m
+    condition: rule_1 then rule_2
+level: critical
+tags:
+    - attack.reconnaissance
+    - attack.lateral_movement
+    - attack.persistence
+
 title: Rapid Web Path Discovery from Single Source (AN2069)
 id: f1a2b3c4-d5e6-4f7a-8b9c-0d1e2f3a4b5c
 status: experimental
-description: Detects when a single source IP performs rapid or low-and-slow scan queries on sensitive paths returning 403 Forbidden status codes, indicating directory brute force scanning.
+description: "Detects when a single source IP performs scan queries on sensitive paths returning 403 Forbidden status codes. Note: SIEM-side aggregation (count(src_ip) by src_ip > 5 in 1m) is required before this generates actionable alerts to avoid noise."
+
 author: Krishna Gupta
 date: 2026-06-30
 logsource:
@@ -6047,17 +6136,23 @@ detection:
             - '^\/.env$'
             - '^\/wp-admin\/.*'
             - '^\/.aws(?:/|$)'
+            - '^\/\.htaccess$'
+            - '^\/backup(?:/|$)'
+            - '^\/config(?:/|$)'
+            - '^\/phpinfo\.php$'
+            - '^\/admin(?:/|$)'
+            - '^\/\.well-known\/.*'
+            - '^\/wp-config\.php$'
+            - '^\/server-status$'
+            - '^\/\.DS_Store$'
         http_status: 403
     filter_crawler:
         user_agent|contains:
             - 'Googlebot'
             - 'Bingbot'
     filter_auth:
-        http_auth_user:
-            - '-'
-            - null
-            - ''
-    condition: (selection and not filter_crawler and filter_auth | count(src_ip) by src_ip > 5 in 1m) or (selection and not filter_crawler and filter_auth | count(src_ip) by src_ip > 2 in 1h)
+        http_auth_user: '-'
+    condition: selection and not filter_crawler and filter_auth
 fields:
     - src_ip
     - http_request_path
@@ -6065,13 +6160,13 @@ fields:
     - user_agent
 falsepositives:
     - Authorized automated vulnerability scanners or penetration testing tools.
-level: high
+level: low
 tags:
     - attack.reconnaissance
     - attack.t1594
     - analytic.an2069
     - detection.det0926
----
+
 title: Suspicious Process Spawning from Web Server Parent (AN2069-WebShell-Spawning)
 id: b2c3d4e5-f6a7-4b8c-9d0e-1a2b3c4d5e6f
 status: experimental
@@ -6104,7 +6199,7 @@ level: high
 tags:
     - attack.execution
     - attack.t1505.003
----
+
 title: Web Shell File Creation (AN2069-WebShell-Files)
 id: c3d4e5f6-a7b8-4c9d-8e0f-1a2b3c4d5e6f
 status: experimental
@@ -6131,11 +6226,12 @@ level: high
 tags:
     - attack.persistence
     - attack.t1505.003
----
+
 title: Web Path Discovery in CDN Access Logs (AN2069-CDN-Logs)
 id: d4e5f6a7-b8c9-4d0e-9f0a-1b2c3d4e5f6a
 status: experimental
-description: Detects web path discovery scans in CDN access logs (Cloudflare).
+description: "Detects web path discovery scans in CDN access logs (Cloudflare). Requires custom Cloudflare log ingestion pipeline and Sigma backend mapping. Note: SIEM-side aggregation (count(client_ip) by client_ip > 5 in 1m) is required before this generates actionable alerts."
+
 logsource:
     product: cloudflare
 detection:
@@ -6148,18 +6244,246 @@ detection:
     selection_status:
         status_code: 403
     filter_auth:
-        http_auth_user:
-            - '-'
-            - null
-            - ''
-    condition: selection_paths and selection_status and filter_auth | count(client_ip) by client_ip > 5 in 1m
+        http_auth_user: '-'
+    condition: selection_paths and selection_status and filter_auth
+level: low
+tags:
+    - attack.reconnaissance
+    - attack.t1594
+
+title: Web Fuzzing Tool User-Agent Detection (AN2069-Fuzzing-Agents)
+id: a3c4d5e6-f7a8-4b9c-8d0e-2f3a4b5c6d7e
+status: experimental
+description: Detects HTTP requests containing User-Agents matching known web fuzzing and reconnaissance tools.
+logsource:
+    category: webserver
+    product: windows
+detection:
+    selection:
+        user_agent|contains:
+            - 'ffuf/'
+            - 'gobuster/'
+            - 'dirsearch'
+            - 'feroxbuster'
+            - 'wfuzz/'
+            - 'Nuclei'
+            - 'sqlmap/'
+            - 'nikto/'
+            - 'BurpCollaborator'
+            - 'DirBuster'
+            - 'OWASP ZAP'
+            - 'masscan'
+            - 'zgrab'
+            - 'python-httpx'
+            - 'rustscan'
+    condition: selection
+level: high
+tags:
+    - attack.reconnaissance
+    - attack.t1594
+
+title: Anomalous HTTP Error Rate from Single Source (AN2069-Error-Spike)
+id: b7e3f1a2-c4d5-4e6f-9a0b-1c2d3e4f5a6b
+status: experimental
+description: >
+  Detects a single source IP generating a high volume of HTTP 4xx or 5xx 
+  error responses in a short window, indicating directory brute-forcing 
+  (404s) or API parameter fuzzing (400/500 errors). Covers the fuzzing 
+  gap that AN2069 misses when tools target non-hardcoded paths or generate 
+  non-403 error codes. Note: SIEM-side aggregation required — 
+  count(http_status) by src_ip where http_status >= 400 > 50 in 1m.
+author: Krishna Gupta
+date: 2026-07-01
+logsource:
+    category: webserver
+    product: windows
+detection:
+    selection_errors:
+        http_status|gte: 400
+    filter_crawler:
+        user_agent|contains:
+            - 'Googlebot'
+            - 'Bingbot'
+    filter_auth_user:
+        http_auth_user: '-'
+    condition: selection_errors and not filter_crawler and filter_auth_user
+fields:
+    - src_ip
+    - http_request_path
+    - http_status
+    - user_agent
+falsepositives:
+    - Legitimate applications with high error rates due to misconfiguration or 
+      buggy mobile clients. Requires SIEM aggregation threshold before alerting.
+level: low
+tags:
+    - attack.reconnaissance
+    - attack.t1594
+    - attack.t1595.003
+    - analytic.an2069
+    - detection.det0926
+
+title: DNS NXDOMAIN Spike from External Source (AN2069-DNS-Recon)
+id: e9f0a1b2-c3d4-4e5f-8a9b-0c1d2e3f4a5b
+status: experimental
+description: >
+  Detects rapid NXDOMAIN (non-existent domain) responses from Zeek DNS logs 
+  targeting subdomain patterns, indicating dangling subdomain enumeration or 
+  broken link checking. An attacker probing for unclaimed subdomains 
+  (e.g., dev.example.com pointing to an expired cloud resource) will generate 
+  a spike of NXDOMAIN responses. Note: SIEM-side aggregation required — 
+  count() by id.orig_h where rcode_name == NXDOMAIN > 20 in 1m.
+author: Krishna Gupta
+date: 2026-07-01
+logsource:
+    product: zeek
+    service: dns
+detection:
+    selection:
+        rcode_name: 'NXDOMAIN'
+    filter_internal:
+        id.orig_h|cidr:
+            - '10.0.0.0/8'
+            - '172.16.0.0/12'
+            - '192.168.0.0/16'
+    condition: selection and not filter_internal
+fields:
+    - id.orig_h
+    - query
+    - rcode_name
+falsepositives:
+    - Misconfigured applications making rapid DNS requests to non-existent 
+      hosts. Aggregation threshold filters most benign cases.
+level: low
+tags:
+    - attack.reconnaissance
+    - attack.t1590
+    - analytic.an2069
+    - detection.det0926
+
+title: Access to Deprecated or Historical Endpoint Patterns (AN2069-Historical-Paths)
+id: 8c4d5e6f-7a8b-4c9d-8e0f-1a2b3c4d5e6f
+status: experimental
+description: Detects access attempts to deprecated API versions or backup files often found via Wayback Machine.
+author: Krishna Gupta
+date: 2026-07-02
+logsource:
+    category: webserver
+    product: windows
+detection:
+    selection:
+        http_request_path|re:
+            - '.*\/v[0-9]+\/.*'          # Old API versions
+            - '.*\/api\/v[0-9]+\/.*'
+            - '.*\.(old|bak|backup|orig|copy|tmp|swp)$'
+            - '.*~$'                      # Vim backup files
+            - '.*\/archive\/.*'
+            - '.*\/deprecated\/.*'
+    condition: selection
+level: low
+tags:
+    - attack.reconnaissance
+    - attack.t1594
+
+title: Exposure File Access (AN2069-Sensitive-Files)
+id: 4a5b6c7d-8e9f-4a1b-2c3d-4e5f6a7b8c9d
+status: experimental
+description: Detects successful retrieval of highly sensitive configuration or repository files (e.g., .git/config, .env), typically discovered via Google Dorking or directory brute-forcing.
+author: Krishna Gupta
+date: 2026-07-02
+logsource:
+    category: webserver
+    product: windows
+detection:
+    selection:
+        http_request_path|re:
+            - '.*\/\.git\/config$'
+            - '.*\/\.git\/HEAD$'
+            - '.*\/composer\.json$'
+            - '.*\/package\.json$'
+            - '.*\/\.env\.[a-z]+$'        # .env.production, .env.local
+            - '.*\/web\.config$'
+            - '.*\/crossdomain\.xml$'
+            - '.*\/clientaccesspolicy\.xml$'
+        http_status:
+            - 200                          # They FOUND something
+    condition: selection
+level: high
+tags:
+    - attack.reconnaissance
+    - attack.t1594
+
+title: Reconnaissance via robots.txt and Sitemap Access (AN2069-Recon-Files)
+id: 7e8f9a0b-1c2d-4e5f-6a7b-8c9d0e1f2a3b
+status: experimental
+description: "Detects manual or automated reconnaissance of sitemaps and security files by non-crawler agents. Note: Requires frequency context (e.g., 5+ hits in 30s) or combination with other recon alerts to be actionable."
+
+author: Krishna Gupta
+date: 2026-07-02
+logsource:
+    category: webserver
+    product: windows
+detection:
+    selection:
+        http_request_path|contains:
+            - '/robots.txt'
+            - '/sitemap.xml'
+            - '/sitemap_index.xml'
+            - '/.well-known/security.txt'
+            - '/humans.txt'
+    filter_crawlers:
+        user_agent|contains:
+            - 'Googlebot'
+            - 'Bingbot'
+            - 'Slurp'
+    condition: selection and not filter_crawlers
+level: low
+tags:
+    - attack.reconnaissance
+    - attack.t1594
+
+title: Web Reconnaissance Followed by Web Shell Execution (AN2069-Correlation)
+id: f2b3c4d5-e6f7-4a8b-9c0d-1e2f3a4b5c6d
+status: experimental
+description: Correlates web scanning (AN2069) from an external IP with a subsequent web shell file creation (AN2069-WebShell-Files) or suspicious process creation spawned by web server processes (AN2069-WebShell-Spawning) targeting the same host within 15 minutes.
+correlation:
+    type: temporal
+    rules:
+        - rule_1: f1a2b3c4-d5e6-4f7a-8b9c-0d1e2f3a4b5c
+        - rule_2: b2c3d4e5-f6a7-4b8c-9d0e-1a2b3c4d5e6f
+        - rule_3: c3d4e5f6-a7b8-4c9d-8e0f-1a2b3c4d5e6f
+    group-by:
+        - src_ip
+        - host
+    timespan: 15m
+    condition: rule_1 then (rule_2 or rule_3) and rule_1.host == (rule_2.host or rule_3.host)
+level: critical
+tags:
+    - attack.reconnaissance
+    - attack.t1594
+    - attack.execution
+    - attack.t1505.003
+
+title: Sustained Low-Rate Web Recon (AN2069-Slow-Recon)
+id: d5e6f7a8-b9c0-4d1e-2f3a-4b5c6d7e8f9a
+status: experimental
+description: Detects methodical, slow manual browsing or crawling of sensitive paths that bypasses short-window volume thresholds.
+correlation:
+    type: event_count
+    rules:
+        - f1a2b3c4-d5e6-4f7a-8b9c-0d1e2f3a4b5c    # AN2069 base
+    group-by: src_ip
+    field: http_request_path
+    timespan: 10m
+    condition:
+        gte: 3
 level: medium
 tags:
     - attack.reconnaissance
     - attack.t1594
----
+
 title: External Port Scanning Detection (AN2070)
-id: c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f
+id: 3c6d7a5b-9f2e-4b1a-8c3d-0e1f2a3b4c5d
 status: experimental
 description: Detects connection sweeps and port scans against external assets originating from single or multiple IP sources, handling distributed and low-and-slow scanning profiles while whitelisting common public search engines.
 author: Krishna Gupta
@@ -6169,34 +6493,19 @@ logsource:
     service: conn
 detection:
     selection:
-        orig_h: '*'  # Source IP
-        resp_h: '*'  # Target IP
-        proto: 'tcp'
-        
-    # Fast scan: many ports in short window
-    fast_scan:
-        selection | count(resp_p) by orig_h > 15 in 60s
-        
-    # Slow scan: many ports over day
-    slow_scan:
-        selection | count(resp_p) by orig_h > 50 in 1d
-        
-    # Distributed scan: many IPs targeting same subnet
-    distributed_scan:
-        selection | count(orig_h) by resp_h_cidr(/24) > 5 in 60s
+        proto:
+            - 'tcp'
+            - 'udp'
     
-    filter_legitimate:
+    filter_legitimate_cidr:
         src_ip|cidr:
             - '1.2.3.0/24'      # Censys
             - '4.5.6.0/24'      # Shodan
-        or user_agent|contains:
-            - 'Shodan'
-            - 'Censys'
-    
+
     filter_internal:
         orig_h|cidr: '10.0.0.0/8'  # Internal scans OK
         
-    condition: (fast_scan or slow_scan or distributed_scan) and not filter_legitimate and not filter_internal
+    condition: selection and not filter_legitimate_cidr and not filter_internal
 fields:
     - orig_h
     - resp_h
@@ -6204,61 +6513,112 @@ fields:
     - proto
 falsepositives:
     - Authorized internal diagnostic vulnerability scanners.
-level: high
+level: low
 tags:
     - attack.reconnaissance
     - attack.t1595
     - analytic.an2070
     - detection.det0927
----
-title: Distributed External Port Scanning (AN2070-Distributed)
-id: c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5a
+
+title: Fast External Port Scanning Detection (AN2070-Fast)
+id: 7b8c9d0e-1f2a-4b3c-9d0e-1a2b3c4d5e6f
 status: experimental
-description: Detects when multiple distinct source IPs query a single destination subnet/IP block in a short window.
-logsource:
-    product: zeek
-    service: conn
+description: Detects connection sweeps and port scans against external assets where a single IP hits more than 15 ports in 60 seconds.
 detection:
     selection:
-        orig_h: '*'
-        resp_h: '*'
         proto: 'tcp'
-    filter_legitimate:
-        src_ip|cidr:
-            - '1.2.3.0/24'
-            - '4.5.6.0/24'
-    filter_internal:
-        orig_h|cidr: '10.0.0.0/8'
-    condition: selection and not filter_legitimate and not filter_internal | count(orig_h) by resp_h_cidr(/24) > 5 in 60s
+    condition: selection
 level: high
 tags:
     - attack.reconnaissance
     - attack.t1595
----
+
 title: Low-and-Slow Active Scanning (AN2070-Slow)
-id: c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5b
+id: f0e1d2c3-b4a5-4968-7a6b-5c4d3e2f1a0b
 status: experimental
 description: Detects slow connection sweeps targeting 50+ ports over a 24-hour timeframe.
+detection:
+    selection:
+        proto: 'tcp'
+    condition: selection
+level: medium
+tags:
+    - attack.reconnaissance
+    - attack.t1595
+
+title: Distributed External Port Scanning (AN2070-Distributed)
+id: 1a2b3c4d-5e6f-4a5b-8c7d-9e0f1a2b3c4d
+status: experimental
+description: Detects when multiple distinct source IPs query a single destination subnet/IP block in a short window.
+detection:
+    selection:
+        proto: 'tcp'
+    condition: selection
+level: high
+tags:
+    - attack.reconnaissance
+    - attack.t1595
+
+title: UDP Port Scanning Detection (AN2070-UDP)
+id: c2d3e4f5-a6b7-4c8d-9e0f-1a2b3c4d5e6f
+status: experimental
+description: >
+  Detects rapid outbound UDP connection attempts to multiple distinct ports 
+  from a single external IP, indicating UDP-based service discovery 
+  (masscan --rate UDP, nmap -sU). Complements the TCP-focused AN2070-Fast 
+  rule. Note: SIEM-side aggregation required — 
+  count(resp_p) by orig_h where proto == UDP > 10 in 60s.
+detection:
+    selection:
+        proto: 'udp'
+    condition: selection
+level: high
+tags:
+    - attack.reconnaissance
+    - attack.t1595
+
+title: Successful Inbound Connection Post-Scan (AN2070-PostScan-Connection)
+id: 9e8d7c6b-5a4f-4321-b0a9-8c7d6e5f4a3b
+status: experimental
+description: Detects a successful inbound socket connection to the host following a port scan. Used as a dependency rule for AN2070-Correlation.
+author: Krishna Gupta
+date: 2026-07-02
 logsource:
     product: zeek
     service: conn
 detection:
     selection:
-        orig_h: '*'
-        resp_h: '*'
+        conn_state:
+            - 'SF'      # Successful full connection
+            - 'S1'      # Connection established
         proto: 'tcp'
-    filter_legitimate:
-        src_ip|cidr:
-            - '1.2.3.0/24'
-            - '4.5.6.0/24'
     filter_internal:
-        orig_h|cidr: '10.0.0.0/8'
-    condition: selection and not filter_legitimate and not filter_internal | count(resp_p) by orig_h > 50 in 1d
-level: medium
+        orig_h|cidr:
+            - '10.0.0.0/8'
+            - '172.16.0.0/12'
+            - '192.168.0.0/16'
+    condition: selection and not filter_internal
+level: low
+tags:
+    - attack.execution
+    - attack.t1190
+
+title: Port Scan Followed by Active Connection and Command Execution (AN2070-Correlation)
+id: 5d4c3b2a-1f0e-4d9c-8b7a-6f5e4d3c2b1a
+status: experimental
+description: Correlates initial active scanning with a successful connection handshake and subsequent process execution anomalies on the same target host.
+detection:
+    selection_scan:
+        proto: 'tcp'
+    selection_shell:
+        Image|endswith: '\cmd.exe'
+    condition: selection_scan or selection_shell
+level: critical
 tags:
     - attack.reconnaissance
     - attack.t1595
----
+    - attack.execution
+
 title: Phishing for Information (AN2073)
 id: d1d2e3f4-f5a6-4b7d-9e9f-0a1b2c3d4e5f
 status: experimental
@@ -6697,7 +7057,7 @@ fields:
     - CommandLine
     - User
 falsepositives:
-    - Legitimate WMIC output formatting using built-in /format: switches for reporting.
+    - 'Legitimate WMIC output formatting using built-in /format: switches for reporting.'
 level: high
 tags:
     - attack.defense_evasion

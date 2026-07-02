@@ -1,0 +1,1153 @@
+[
+  {
+    "ruleId": "AN2070_FAST_EXTERNAL_PORT_SCANNING",
+    "ruleName": "Fast External Port Scanning Detection (AN2070-Fast)",
+    "ruleFormat": "IR_v1",
+    "ruleType": "THRESHOLD",
+    "ruleOrigin": "cep-translated",
+    "description": "Detects connection sweeps and port scans against external assets where a single IP hits more than 12 distinct ports with failed connections in 60 seconds (Testing Phase).",
+    "enabled": true,
+    "version": 3,
+    "correlationKey": "orig_h",
+    "eventSources": [
+      "zeek"
+    ],
+    "window": {
+      "type": "sliding",
+      "minSpanSeconds": 0,
+      "durationSeconds": 60
+    },
+    "output": {
+      "tags": [
+        "attack.reconnaissance",
+        "attack.t1595"
+      ],
+      "message": "Fast External Port Scanning Detection (AN2070-Fast)",
+      "severity": "HIGH",
+      "entityField": null,
+      "mitreTactics": [
+        "TA0043"
+      ],
+      "includeFields": [],
+      "riskScoreDelta": 5,
+      "mitreTechniques": [
+        "T1595"
+      ]
+    },
+    "stages": [
+      {
+        "stageIndex": 0,
+        "match": {
+          "groups": [],
+          "operator": "AND",
+          "conditions": [
+            {
+              "field": "proto",
+              "value": "tcp",
+              "values": [],
+              "operator": "equals"
+            },
+            {
+              "field": "conn_state",
+              "value": "SF",
+              "values": [],
+              "operator": "not_equals"
+            },
+            {
+              "field": "orig_h",
+              "value": "10.0.0.0/8",
+              "values": [],
+              "operator": "not_cidr"
+            },
+            {
+              "field": "orig_h",
+              "value": "1.2.3.0/24",
+              "values": [],
+              "operator": "not_cidr"
+            },
+            {
+              "field": "orig_h",
+              "value": "4.5.6.0/24",
+              "values": [],
+              "operator": "not_cidr"
+            }
+          ]
+        },
+        "minGapMs": 0,
+        "aggregate": {
+          "field": null,
+          "groupBy": [],
+          "function": "count",
+          "threshold": 12,
+          "distinctField": "resp_p"
+        },
+        "eventSources": [],
+        "withinSeconds": 0,
+        "minOccurrences": 0,
+        "correlation_key": "orig_h",
+        "minDistinctCount": 0,
+        "requireDistinctField": null,
+        "excludeSignatureContains": []
+      }
+    ],
+    "suppression": {
+      "groupBy": [
+        "orig_h"
+      ],
+      "durationSeconds": 90
+    },
+    "maxGapSeconds": 0,
+    "behavioralConstraints": null,
+    "maxConcurrentInstances": 0
+  },
+  {
+    "ruleId": "AN2070_LOW_AND_SLOW_SCANNING",
+    "ruleName": "Low-and-Slow Active Scanning (AN2070-Slow)",
+    "ruleFormat": "IR_v1",
+    "ruleType": "THRESHOLD",
+    "ruleOrigin": "cep-translated",
+    "description": "Detects slow connection sweeps targeting 35+ distinct ports over a 24-hour timeframe (Testing Phase).",
+    "enabled": true,
+    "version": 3,
+    "correlationKey": "orig_h",
+    "eventSources": [
+      "zeek"
+    ],
+    "window": {
+      "type": "sliding",
+      "minSpanSeconds": 0,
+      "durationSeconds": 86400
+    },
+    "output": {
+      "tags": [
+        "attack.reconnaissance",
+        "attack.t1595"
+      ],
+      "message": "Low-and-Slow Active Scanning (AN2070-Slow)",
+      "severity": "MEDIUM",
+      "entityField": null,
+      "mitreTactics": [
+        "TA0043"
+      ],
+      "includeFields": [],
+      "riskScoreDelta": 5,
+      "mitreTechniques": [
+        "T1595"
+      ]
+    },
+    "stages": [
+      {
+        "stageIndex": 0,
+        "match": {
+          "groups": [],
+          "operator": "AND",
+          "conditions": [
+            {
+              "field": "proto",
+              "value": "tcp",
+              "values": [],
+              "operator": "equals"
+            },
+            {
+              "field": "orig_h",
+              "value": "10.0.0.0/8",
+              "values": [],
+              "operator": "not_cidr"
+            },
+            {
+              "field": "orig_h",
+              "value": "1.2.3.0/24",
+              "values": [],
+              "operator": "not_cidr"
+            },
+            {
+              "field": "orig_h",
+              "value": "4.5.6.0/24",
+              "values": [],
+              "operator": "not_cidr"
+            }
+          ]
+        },
+        "minGapMs": 0,
+        "aggregate": {
+          "field": null,
+          "groupBy": [],
+          "function": "count",
+          "threshold": 35,
+          "distinctField": "resp_p"
+        },
+        "eventSources": [],
+        "withinSeconds": 0,
+        "minOccurrences": 0,
+        "correlation_key": "orig_h",
+        "minDistinctCount": 0,
+        "requireDistinctField": null,
+        "excludeSignatureContains": []
+      }
+    ],
+    "suppression": {
+      "groupBy": [
+        "orig_h"
+      ],
+      "durationSeconds": 300
+    },
+    "maxGapSeconds": 0,
+    "behavioralConstraints": null,
+    "maxConcurrentInstances": 0
+  },
+  {
+    "ruleId": "AN2070_DISTRIBUTED_SCANNING",
+    "ruleName": "Distributed External Port Scanning (AN2070-Distributed)",
+    "ruleFormat": "IR_v1",
+    "ruleType": "THRESHOLD",
+    "ruleOrigin": "cep-translated",
+    "description": "Detects when 6 or more distinct source IPs query a single destination subnet/IP block on non-standard ports in a short window.",
+    "enabled": true,
+    "version": 3,
+    "correlationKey": "resp_h",
+    "eventSources": [
+      "zeek"
+    ],
+    "window": {
+      "type": "sliding",
+      "minSpanSeconds": 0,
+      "durationSeconds": 60
+    },
+    "output": {
+      "tags": [
+        "attack.reconnaissance",
+        "attack.t1595"
+      ],
+      "message": "Distributed External Port Scanning (AN2070-Distributed)",
+      "severity": "HIGH",
+      "entityField": null,
+      "mitreTactics": [
+        "TA0043"
+      ],
+      "includeFields": [],
+      "riskScoreDelta": 5,
+      "mitreTechniques": [
+        "T1595"
+      ]
+    },
+    "stages": [
+      {
+        "stageIndex": 0,
+        "match": {
+          "groups": [],
+          "operator": "AND",
+          "conditions": [
+            {
+              "field": "proto",
+              "value": "tcp",
+              "values": [],
+              "operator": "equals"
+            },
+            {
+              "field": "resp_p",
+              "value": "^(80|443|53|123)$",
+              "values": [],
+              "operator": "not_regex"
+            },
+            {
+              "field": "orig_h",
+              "value": "10.0.0.0/8",
+              "values": [],
+              "operator": "not_cidr"
+            },
+            {
+              "field": "orig_h",
+              "value": "1.2.3.0/24",
+              "values": [],
+              "operator": "not_cidr"
+            },
+            {
+              "field": "orig_h",
+              "value": "4.5.6.0/24",
+              "values": [],
+              "operator": "not_cidr"
+            }
+          ]
+        },
+        "minGapMs": 0,
+        "aggregate": {
+          "field": null,
+          "groupBy": [],
+          "function": "count",
+          "threshold": 6,
+          "distinctField": "orig_h"
+        },
+        "eventSources": [],
+        "withinSeconds": 0,
+        "minOccurrences": 0,
+        "correlation_key": "resp_h",
+        "minDistinctCount": 0,
+        "requireDistinctField": null,
+        "excludeSignatureContains": []
+      }
+    ],
+    "suppression": {
+      "groupBy": [
+        "resp_h"
+      ],
+      "durationSeconds": 90
+    },
+    "maxGapSeconds": 0,
+    "behavioralConstraints": null,
+    "maxConcurrentInstances": 0
+  },
+  {
+    "ruleId": "AN2070_UDP_SCANNING",
+    "ruleName": "UDP Port Scanning Detection (AN2070-UDP)",
+    "ruleFormat": "IR_v1",
+    "ruleType": "THRESHOLD",
+    "ruleOrigin": "cep-translated",
+    "description": "Detects rapid outbound UDP connection attempts to 9+ distinct non-standard ports from a single external IP (Testing Phase).",
+    "enabled": true,
+    "version": 3,
+    "correlationKey": "orig_h",
+    "eventSources": [
+      "zeek"
+    ],
+    "window": {
+      "type": "sliding",
+      "minSpanSeconds": 0,
+      "durationSeconds": 60
+    },
+    "output": {
+      "tags": [
+        "attack.reconnaissance",
+        "attack.t1595"
+      ],
+      "message": "UDP Port Scanning Detection (AN2070-UDP)",
+      "severity": "HIGH",
+      "entityField": null,
+      "mitreTactics": [
+        "TA0043"
+      ],
+      "includeFields": [],
+      "riskScoreDelta": 5,
+      "mitreTechniques": [
+        "T1595"
+      ]
+    },
+    "stages": [
+      {
+        "stageIndex": 0,
+        "match": {
+          "groups": [],
+          "operator": "AND",
+          "conditions": [
+            {
+              "field": "proto",
+              "value": "udp",
+              "values": [],
+              "operator": "equals"
+            },
+            {
+              "field": "resp_p",
+              "value": "^(53|123|161|162)$",
+              "values": [],
+              "operator": "not_regex"
+            },
+            {
+              "field": "orig_h",
+              "value": "10.0.0.0/8",
+              "values": [],
+              "operator": "not_cidr"
+            },
+            {
+              "field": "orig_h",
+              "value": "1.2.3.0/24",
+              "values": [],
+              "operator": "not_cidr"
+            },
+            {
+              "field": "orig_h",
+              "value": "4.5.6.0/24",
+              "values": [],
+              "operator": "not_cidr"
+            }
+          ]
+        },
+        "minGapMs": 0,
+        "aggregate": {
+          "field": null,
+          "groupBy": [],
+          "function": "count",
+          "threshold": 9,
+          "distinctField": "resp_p"
+        },
+        "eventSources": [],
+        "withinSeconds": 0,
+        "minOccurrences": 0,
+        "correlation_key": "orig_h",
+        "minDistinctCount": 0,
+        "requireDistinctField": null,
+        "excludeSignatureContains": []
+      }
+    ],
+    "suppression": {
+      "groupBy": [
+        "orig_h"
+      ],
+      "durationSeconds": 90
+    },
+    "maxGapSeconds": 0,
+    "behavioralConstraints": null,
+    "maxConcurrentInstances": 0
+  },
+  {
+    "ruleId": "AN2070_SCAN_TO_EXECUTION_SEQUENCE",
+    "ruleName": "Port Scan Followed by Active Connection and Command Execution (AN2070-Correlation)",
+    "ruleFormat": "IR_v1",
+    "ruleType": "SEQUENCE",
+    "ruleOrigin": "cep-translated",
+    "description": "Correlates initial active scanning with a successful connection handshake and subsequent process execution anomalies on the same target host (Testing Phase).",
+    "enabled": true,
+    "version": 3,
+    "correlationKey": "resp_h",
+    "eventSources": [
+      "zeek",
+      "windows"
+    ],
+    "window": {
+      "type": "sliding",
+      "minSpanSeconds": 0,
+      "durationSeconds": 900
+    },
+    "output": {
+      "tags": [
+        "attack.reconnaissance",
+        "attack.t1595",
+        "attack.execution"
+      ],
+      "message": "Port Scan Followed by Active Connection and Command Execution (AN2070-Correlation)",
+      "severity": "CRITICAL",
+      "entityField": null,
+      "mitreTactics": [
+        "TA0043",
+        "TA0002"
+      ],
+      "includeFields": [],
+      "riskScoreDelta": 10,
+      "mitreTechniques": [
+        "T1595"
+      ]
+    },
+    "stages": [
+      {
+        "stageIndex": 0,
+        "match": {
+          "groups": [],
+          "operator": "AND",
+          "conditions": [
+            {
+              "field": "proto",
+              "value": "tcp",
+              "values": [],
+              "operator": "equals"
+            },
+            {
+              "field": "conn_state",
+              "value": "SF",
+              "values": [],
+              "operator": "not_equals"
+            },
+            {
+              "field": "orig_h",
+              "value": "10.0.0.0/8",
+              "values": [],
+              "operator": "not_cidr"
+            },
+            {
+              "field": "orig_h",
+              "value": "1.2.3.0/24",
+              "values": [],
+              "operator": "not_cidr"
+            },
+            {
+              "field": "orig_h",
+              "value": "4.5.6.0/24",
+              "values": [],
+              "operator": "not_cidr"
+            }
+          ]
+        },
+        "minGapMs": 0,
+        "aggregate": {
+          "field": null,
+          "groupBy": [],
+          "function": "count",
+          "threshold": 12,
+          "distinctField": "resp_p"
+        },
+        "eventSources": [],
+        "withinSeconds": 0,
+        "minOccurrences": 0,
+        "correlation_key": "resp_h",
+        "minDistinctCount": 0,
+        "requireDistinctField": null,
+        "excludeSignatureContains": []
+      },
+      {
+        "stageIndex": 1,
+        "match": {
+          "groups": [],
+          "operator": "AND",
+          "conditions": [
+            {
+              "field": "conn_state",
+              "value": "SF",
+              "values": [],
+              "operator": "equals"
+            },
+            {
+              "field": "orig_h",
+              "value": "10.0.0.0/8",
+              "values": [],
+              "operator": "not_cidr"
+            },
+            {
+              "field": "orig_h",
+              "value": "172.16.0.0/12",
+              "values": [],
+              "operator": "not_cidr"
+            },
+            {
+              "field": "orig_h",
+              "value": "192.168.0.0/16",
+              "values": [],
+              "operator": "not_cidr"
+            }
+          ]
+        },
+        "minGapMs": 0,
+        "aggregate": {
+          "field": null,
+          "groupBy": [],
+          "function": "count",
+          "threshold": 1,
+          "distinctField": null
+        },
+        "eventSources": [],
+        "withinSeconds": 900,
+        "minOccurrences": 0,
+        "correlation_key": "resp_h",
+        "minDistinctCount": 0,
+        "requireDistinctField": null,
+        "excludeSignatureContains": []
+      },
+      {
+        "stageIndex": 2,
+        "match": {
+          "groups": [
+            {
+              "groups": [],
+              "operator": "OR",
+              "conditions": [
+                {
+                  "field": "Image",
+                  "value": "cmd.exe",
+                  "values": [],
+                  "operator": "contains"
+                },
+                {
+                  "field": "Image",
+                  "value": "powershell.exe",
+                  "values": [],
+                  "operator": "contains"
+                }
+              ]
+            },
+            {
+              "groups": [],
+              "operator": "OR",
+              "conditions": [
+                {
+                  "field": "ParentImage",
+                  "value": "w3wp.exe",
+                  "values": [],
+                  "operator": "contains"
+                },
+                {
+                  "field": "ParentImage",
+                  "value": "sshd.exe",
+                  "values": [],
+                  "operator": "contains"
+                },
+                {
+                  "field": "ParentImage",
+                  "value": "services.exe",
+                  "values": [],
+                  "operator": "contains"
+                },
+                {
+                  "field": "ParentImage",
+                  "value": "httpd.exe",
+                  "values": [],
+                  "operator": "contains"
+                },
+                {
+                  "field": "ParentImage",
+                  "value": "nginx.exe",
+                  "values": [],
+                  "operator": "contains"
+                },
+                {
+                  "field": "ParentImage",
+                  "value": "apache2.exe",
+                  "values": [],
+                  "operator": "contains"
+                },
+                {
+                  "field": "ParentImage",
+                  "value": "tomcat.exe",
+                  "values": [],
+                  "operator": "contains"
+                }
+              ]
+            }
+          ],
+          "operator": "AND",
+          "conditions": [
+            {
+              "field": "EventID",
+              "value": "1",
+              "values": [],
+              "operator": "equals"
+            },
+            {
+              "field": "CommandLine",
+              "value": "iisreset|logrotate|systemctl",
+              "values": [],
+              "operator": "not_regex"
+            }
+          ]
+        },
+        "minGapMs": 0,
+        "aggregate": {
+          "field": null,
+          "groupBy": [],
+          "function": "count",
+          "threshold": 1,
+          "distinctField": null
+        },
+        "eventSources": [],
+        "withinSeconds": 900,
+        "minOccurrences": 0,
+        "correlation_key": "resp_h",
+        "minDistinctCount": 0,
+        "requireDistinctField": null,
+        "excludeSignatureContains": []
+      }
+    ],
+    "suppression": {
+      "groupBy": [
+        "resp_h"
+      ],
+      "durationSeconds": 300
+    },
+    "maxGapSeconds": 0,
+    "behavioralConstraints": null,
+    "maxConcurrentInstances": 0
+  },
+  {
+    "ruleId": "AN2069_SLOW_WEB_RECON",
+    "ruleName": "Sustained Low-Rate Web Recon (AN2069-Slow-Recon)",
+    "ruleFormat": "IR_v1",
+    "ruleType": "THRESHOLD",
+    "ruleOrigin": "cep-translated",
+    "description": "Detects methodical, slow manual browsing or crawling of sensitive paths across 3+ distinct endpoints (Testing Phase).",
+    "enabled": true,
+    "version": 3,
+    "correlationKey": "src_ip",
+    "eventSources": [
+      "webserver"
+    ],
+    "window": {
+      "type": "sliding",
+      "minSpanSeconds": 0,
+      "durationSeconds": 600
+    },
+    "output": {
+      "tags": [
+        "attack.reconnaissance",
+        "attack.t1594"
+      ],
+      "message": "Sustained Low-Rate Web Recon (AN2069-Slow-Recon)",
+      "severity": "MEDIUM",
+      "entityField": null,
+      "mitreTactics": [
+        "TA0043"
+      ],
+      "includeFields": [],
+      "riskScoreDelta": 5,
+      "mitreTechniques": [
+        "T1594"
+      ]
+    },
+    "stages": [
+      {
+        "stageIndex": 0,
+        "match": {
+          "groups": [],
+          "operator": "AND",
+          "conditions": [
+            {
+              "field": "http_status",
+              "value": "403",
+              "values": [],
+              "operator": "equals"
+            },
+            {
+              "field": "http_request_path",
+              "value": "(^|/)(\\.git|\\.env|wp-admin|wp-config\\.php|backup|config|admin|\\.htaccess|\\.aws|phpinfo\\.php|\\.well-known|server-status|\\.DS_Store)(/|$)",
+              "values": [],
+              "operator": "regex"
+            }
+          ]
+        },
+        "minGapMs": 0,
+        "aggregate": {
+          "field": null,
+          "groupBy": [],
+          "function": "count",
+          "threshold": 3,
+          "distinctField": "http_request_path"
+        },
+        "eventSources": [],
+        "withinSeconds": 0,
+        "minOccurrences": 0,
+        "correlation_key": "src_ip",
+        "minDistinctCount": 0,
+        "requireDistinctField": null,
+        "excludeSignatureContains": []
+      }
+    ],
+    "suppression": {
+      "groupBy": [
+        "src_ip"
+      ],
+      "durationSeconds": 90
+    },
+    "maxGapSeconds": 0,
+    "behavioralConstraints": null,
+    "maxConcurrentInstances": 0
+  },
+  {
+    "ruleId": "AN2069_RECON_TO_WEBSHELL_SEQUENCE",
+    "ruleName": "Web Reconnaissance Followed by Web Shell Execution (AN2069-Correlation)",
+    "ruleFormat": "IR_v1",
+    "ruleType": "SEQUENCE",
+    "ruleOrigin": "cep-translated",
+    "description": "Correlates web scanning (AN2069) from an external IP with a subsequent web shell file creation or suspicious process creation (including encoded commands).",
+    "enabled": true,
+    "version": 3,
+    "correlationKey": "host",
+    "eventSources": [
+      "webserver",
+      "windows"
+    ],
+    "window": {
+      "type": "sliding",
+      "minSpanSeconds": 0,
+      "durationSeconds": 900
+    },
+    "output": {
+      "tags": [
+        "attack.reconnaissance",
+        "attack.t1594",
+        "attack.execution"
+      ],
+      "message": "Web Reconnaissance Followed by Web Shell Execution (AN2069-Correlation)",
+      "severity": "CRITICAL",
+      "entityField": null,
+      "mitreTactics": [
+        "TA0043",
+        "TA0002"
+      ],
+      "includeFields": [],
+      "riskScoreDelta": 10,
+      "mitreTechniques": [
+        "T1594"
+      ]
+    },
+    "stages": [
+      {
+        "stageIndex": 0,
+        "match": {
+          "groups": [],
+          "operator": "AND",
+          "conditions": [
+            {
+              "field": "http_status",
+              "value": "403",
+              "values": [],
+              "operator": "equals"
+            },
+            {
+              "field": "http_request_path",
+              "value": "(^|/)(\\.git|\\.env|wp-admin|wp-config\\.php|backup|config|admin|\\.htaccess|\\.aws|phpinfo\\.php|\\.well-known|server-status|\\.DS_Store)(/|$)",
+              "values": [],
+              "operator": "regex"
+            }
+          ]
+        },
+        "minGapMs": 0,
+        "aggregate": {
+          "field": null,
+          "groupBy": [],
+          "function": "count",
+          "threshold": 3,
+          "distinctField": null
+        },
+        "eventSources": [],
+        "withinSeconds": 0,
+        "minOccurrences": 0,
+        "correlation_key": "host",
+        "minDistinctCount": 0,
+        "requireDistinctField": null,
+        "excludeSignatureContains": []
+      },
+      {
+        "stageIndex": 1,
+        "match": {
+          "groups": [
+            {
+              "groups": [],
+              "operator": "OR",
+              "conditions": [
+                {
+                  "field": "ParentImage",
+                  "value": "w3wp\\.exe|httpd\\.exe|nginx\\.exe|apache2\\.exe|tomcat\\.exe",
+                  "values": [],
+                  "operator": "regex"
+                },
+                {
+                  "field": "EventID",
+                  "value": "11",
+                  "values": [],
+                  "operator": "equals"
+                }
+              ]
+            },
+            {
+              "groups": [],
+              "operator": "OR",
+              "conditions": [
+                {
+                  "field": "Image",
+                  "value": "cmd\\.exe|powershell\\.exe|bash\\.exe|sh\\.exe",
+                  "values": [],
+                  "operator": "regex"
+                },
+                {
+                  "field": "CommandLine",
+                  "value": "-enc|IEX|curl|wget|nc",
+                  "values": [],
+                  "operator": "regex"
+                },
+                {
+                  "field": "TargetFilename",
+                  "value": "\\.aspx$|\\.php$|\\.jsp$|\\.ashx$",
+                  "values": [],
+                  "operator": "regex"
+                }
+              ]
+            }
+          ],
+          "operator": "AND",
+          "conditions": []
+        },
+        "minGapMs": 0,
+        "aggregate": {
+          "field": null,
+          "groupBy": [],
+          "function": "count",
+          "threshold": 1,
+          "distinctField": null
+        },
+        "eventSources": [],
+        "withinSeconds": 900,
+        "minOccurrences": 0,
+        "correlation_key": "host",
+        "minDistinctCount": 0,
+        "requireDistinctField": null,
+        "excludeSignatureContains": []
+      }
+    ],
+    "suppression": {
+      "groupBy": [
+        "host"
+      ],
+      "durationSeconds": 300
+    },
+    "maxGapSeconds": 0,
+    "behavioralConstraints": null,
+    "maxConcurrentInstances": 0
+  },
+  {
+    "ruleId": "AN2069_HTTP_ERROR_SPIKE_DISTINCT",
+    "ruleName": "Anomalous Spike in HTTP Server Errors on Distinct URLs (AN2069-Error-Spike)",
+    "ruleFormat": "IR_v1",
+    "ruleType": "THRESHOLD",
+    "ruleOrigin": "cep-translated",
+    "description": "Detects high volume of HTTP 4xx/5xx errors on distinct URLs from a single IP (Testing Phase).",
+    "enabled": true,
+    "version": 3,
+    "correlationKey": "src_ip",
+    "eventSources": [
+      "webserver"
+    ],
+    "window": {
+      "type": "sliding",
+      "minSpanSeconds": 0,
+      "durationSeconds": 60
+    },
+    "output": {
+      "tags": [
+        "attack.reconnaissance",
+        "attack.t1594",
+        "attack.t1595.003"
+      ],
+      "message": "Anomalous Spike in HTTP Server Errors on Distinct URLs (AN2069-Error-Spike)",
+      "severity": "LOW",
+      "entityField": null,
+      "mitreTactics": [
+        "TA0043"
+      ],
+      "includeFields": [],
+      "riskScoreDelta": 3,
+      "mitreTechniques": [
+        "T1594"
+      ]
+    },
+    "stages": [
+      {
+        "stageIndex": 0,
+        "match": {
+          "groups": [],
+          "operator": "AND",
+          "conditions": [
+            {
+              "field": "http_status",
+              "value": "400",
+              "values": [],
+              "operator": "gte"
+            },
+            {
+              "field": "user_agent",
+              "value": "Googlebot|Bingbot",
+              "values": [],
+              "operator": "not_regex"
+            }
+          ]
+        },
+        "minGapMs": 0,
+        "aggregate": {
+          "field": null,
+          "groupBy": [],
+          "function": "count",
+          "threshold": 12,
+          "distinctField": "http_request_path"
+        },
+        "eventSources": [],
+        "withinSeconds": 0,
+        "minOccurrences": 0,
+        "correlation_key": "src_ip",
+        "minDistinctCount": 0,
+        "requireDistinctField": null,
+        "excludeSignatureContains": []
+      }
+    ],
+    "suppression": {
+      "groupBy": [
+        "src_ip"
+      ],
+      "durationSeconds": 90
+    },
+    "maxGapSeconds": 0,
+    "behavioralConstraints": null,
+    "maxConcurrentInstances": 0
+  },
+  {
+    "ruleId": "AN2069_HTTP_ERROR_SPIKE_FLAT",
+    "ruleName": "Anomalous Spike in HTTP Server Errors on Single Endpoint (AN2069-Error-Spike-Flat)",
+    "ruleFormat": "IR_v1",
+    "ruleType": "THRESHOLD",
+    "ruleOrigin": "cep-translated",
+    "description": "Detects high volume of HTTP 4xx/5xx errors from a single IP, indicative of parameter/IDOR fuzzing on a single endpoint (Testing Phase).",
+    "enabled": true,
+    "version": 1,
+    "correlationKey": "src_ip",
+    "eventSources": [
+      "webserver"
+    ],
+    "window": {
+      "type": "sliding",
+      "minSpanSeconds": 0,
+      "durationSeconds": 60
+    },
+    "output": {
+      "tags": [
+        "attack.reconnaissance",
+        "attack.t1594",
+        "attack.t1595.003"
+      ],
+      "message": "Anomalous Spike in HTTP Server Errors on Single Endpoint (AN2069-Error-Spike-Flat)",
+      "severity": "LOW",
+      "entityField": null,
+      "mitreTactics": [
+        "TA0043"
+      ],
+      "includeFields": [],
+      "riskScoreDelta": 3,
+      "mitreTechniques": [
+        "T1594"
+      ]
+    },
+    "stages": [
+      {
+        "stageIndex": 0,
+        "match": {
+          "groups": [],
+          "operator": "AND",
+          "conditions": [
+            {
+              "field": "http_status",
+              "value": "400",
+              "values": [],
+              "operator": "gte"
+            },
+            {
+              "field": "user_agent",
+              "value": "Googlebot|Bingbot",
+              "values": [],
+              "operator": "not_regex"
+            }
+          ]
+        },
+        "minGapMs": 0,
+        "aggregate": {
+          "field": null,
+          "groupBy": [],
+          "function": "count",
+          "threshold": 18,
+          "distinctField": null
+        },
+        "eventSources": [],
+        "withinSeconds": 0,
+        "minOccurrences": 0,
+        "correlation_key": "src_ip",
+        "minDistinctCount": 0,
+        "requireDistinctField": null,
+        "excludeSignatureContains": []
+      }
+    ],
+    "suppression": {
+      "groupBy": [
+        "src_ip"
+      ],
+      "durationSeconds": 90
+    },
+    "maxGapSeconds": 0,
+    "behavioralConstraints": null,
+    "maxConcurrentInstances": 0
+  },
+  {
+    "ruleId": "AN2069_DNS_NXDOMAIN_SPIKE",
+    "ruleName": "DNS NXDOMAIN Spike from External Source (AN2069-DNS-Recon)",
+    "ruleFormat": "IR_v1",
+    "ruleType": "THRESHOLD",
+    "ruleOrigin": "cep-translated",
+    "description": "Detects rapid NXDOMAIN responses across 12+ distinct subdomains, indicating dangling subdomain enumeration (Testing Phase).",
+    "enabled": true,
+    "version": 3,
+    "correlationKey": "id.orig_h",
+    "eventSources": [
+      "zeek"
+    ],
+    "window": {
+      "type": "sliding",
+      "minSpanSeconds": 0,
+      "durationSeconds": 120
+    },
+    "output": {
+      "tags": [
+        "attack.reconnaissance",
+        "attack.t1590"
+      ],
+      "message": "DNS NXDOMAIN Spike from External Source (AN2069-DNS-Recon)",
+      "severity": "LOW",
+      "entityField": null,
+      "mitreTactics": [
+        "TA0043"
+      ],
+      "includeFields": [],
+      "riskScoreDelta": 3,
+      "mitreTechniques": [
+        "T1590"
+      ]
+    },
+    "stages": [
+      {
+        "stageIndex": 0,
+        "match": {
+          "groups": [],
+          "operator": "AND",
+          "conditions": [
+            {
+              "field": "rcode_name",
+              "value": "NXDOMAIN",
+              "values": [],
+              "operator": "equals"
+            },
+            {
+              "field": "id.orig_h",
+              "value": "10.0.0.0/8",
+              "values": [],
+              "operator": "not_cidr"
+            },
+            {
+              "field": "id.orig_h",
+              "value": "172.16.0.0/12",
+              "values": [],
+              "operator": "not_cidr"
+            },
+            {
+              "field": "id.orig_h",
+              "value": "192.168.0.0/16",
+              "values": [],
+              "operator": "not_cidr"
+            }
+          ]
+        },
+        "minGapMs": 0,
+        "aggregate": {
+          "field": null,
+          "groupBy": [],
+          "function": "count",
+          "threshold": 12,
+          "distinctField": "query"
+        },
+        "eventSources": [],
+        "withinSeconds": 0,
+        "minOccurrences": 0,
+        "correlation_key": "id.orig_h",
+        "minDistinctCount": 0,
+        "requireDistinctField": null,
+        "excludeSignatureContains": []
+      }
+    ],
+    "suppression": {
+      "groupBy": [
+        "id.orig_h"
+      ],
+      "durationSeconds": 90
+    },
+    "maxGapSeconds": 0,
+    "behavioralConstraints": null,
+    "maxConcurrentInstances": 0
+  }
+]

@@ -34,12 +34,12 @@ Verify your Sysmon agent configuration permits and forwards the following Event 
 
 | Sysmon Event ID | Schema Category | Detects |
 |---|---|---|
-| **EID 1** | `process_creation` | LOLBin execution, binary renaming, network share enumerations, Discovery cmdlets. |
+| **EID 1** | `process_creation` | LOLBin execution, Port Scan to Command Execution chains, Discovery cmdlets. |
 | **EID 3** | `network_connection` | Inbound SSH reverse shells, LLMNR/NBT-NS binding, outgoing beaconing connections. |
 | **EID 7** | `image_load` | Memory injection DLL loads, keylogger libraries, LSASS hooking. |
 | **EID 8** | `create_remote_thread` | Memory injection chains. |
 | **EID 10** | `process_access` | LSASS memory access, credential dumping. |
-| **EID 11** | `file_event` | Web shell writes, malicious installers dropping payloads. |
+| **EID 11** | `file_event` | Web shell writes (.aspx, .php, etc.) and malicious installers dropping payloads. |
 | **EID 12 & 13** | `registry_event` | Registry run keys, MFA tampering, keyboard layout modifications. |
 | **EID 22** | `dns_query` | DNS queries (essential for DNS Tunneling correlation rules). |
 
@@ -48,8 +48,10 @@ Verify your Sysmon agent configuration permits and forwards the following Event 
 ## 4. Network and External Sensors
 If the red team is testing network-level or external tactics, these logs must also be ingested:
 
-*   **IIS / Web Server Access Logs:** Required to detect web directory scans, path discovery, and web shell interactions.
+*   **IIS / Web Server Access Logs:** Required to detect web directory scans, sensitive path discovery, API parameter fuzzing (via HTTP 4xx/5xx error spikes), and web shell interactions.
 *   **Web Proxy / WAF Logs:** Required to detect GenAI data leakages and external scanning.
+*   **Zeek Logs (conn, dns):** Required to detect external port scanning, UDP scans, and broken link/subdomain enumeration (NXDOMAIN spikes).
+*   **CDN Access Logs (e.g., Cloudflare):** Required to detect reconnaissance tools and web path discovery bypassing local proxy edge infrastructure.
 *   **Mail Gateway Logs:** Required to detect inbound phishing for information.
 
 ---

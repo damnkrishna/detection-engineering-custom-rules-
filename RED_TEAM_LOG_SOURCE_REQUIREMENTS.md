@@ -627,21 +627,35 @@ This section lists all rules currently present on disk, grouped by tactic, and m
 | AN1543 | T1078 | Security (4624, 4625, 4648, 4688, 4703, 4738, etc.) | security | Anomalous Administrative Account Logon |
 | AN1543 | T1078 | Sysmon EID 3 (network_connection) | Microsoft-Windows-Sysmon/Operational | Anomalous Administrative Account Network Connection |
 
-### RECONNAISSANCE (14 Rules)
+### RECONNAISSANCE (26 Rules)
 
 | Rule ID | Technique | Log Source Required | Target Channel | Title |
 |---|---|---|---|---|
 | AN2067 | T1592 | Sysmon EID 1 (process_creation) | Microsoft-Windows-Sysmon/Operational | Suspicious System Information Gathering |
-| AN2069 | T1594 | Sysmon / Security Logs | Sysmon / Security | Rapid Web Path Discovery from Single Source |
-| AN2070 | T1595 | Sysmon / Security Logs | Sysmon / Security | External Port Scanning Detection |
+| AN2069 | T1594 | Web Proxy/Firewall | webserver | Rapid Web Path Discovery from Single Source |
+| AN2069-WebShell-Spawning | T1505.003 | Sysmon EID 1 | Microsoft-Windows-Sysmon/Operational | Suspicious Process Spawning from Web Server Parent |
+| AN2069-WebShell-Files | T1505.003 | Sysmon EID 11 | Microsoft-Windows-Sysmon/Operational | Web Shell File Creation |
+| AN2069-CDN-Logs | T1594 | CDN Access Logs | Cloudflare | Web Path Discovery in CDN Access Logs |
+| AN2069-Fuzzing-Agents | T1594 | Web Proxy/Firewall | webserver | Web Fuzzing Tool User-Agent Detection |
+| AN2069-Error-Spike | T1594 | Web Proxy/Firewall | webserver | Anomalous HTTP Error Rate from Single Source |
+| AN2069-DNS-Recon | T1590 | Zeek DNS Logs | zeek/dns | DNS NXDOMAIN Spike from External Source |
+| AN2069-Historical-Paths | T1594 | Web Proxy/Firewall | webserver | Access to Deprecated or Historical Endpoint Patterns |
+| AN2069-Sensitive-Files | T1594 | Web Proxy/Firewall | webserver | Exposure File Access |
+| AN2069-Recon-Files | T1594 | Web Proxy/Firewall | webserver | Reconnaissance via robots.txt and Sitemap Access |
+| AN2069-Slow-Recon | T1594 | Web Proxy/Firewall | webserver | Sustained Low-Rate Web Recon |
+| AN2069-Correlation | T1594 | Multiple | SIEM | Web Reconnaissance Followed by Web Shell Execution |
+| AN2070 | T1595 | Zeek Conn Logs | zeek/conn | External Port Scanning Detection |
+| AN2070-Fast | T1595 | Zeek Conn Logs | zeek/conn | Fast External Port Scanning Detection |
+| AN2070-Slow | T1595 | Zeek Conn Logs | zeek/conn | Low-and-Slow Active Scanning |
+| AN2070-Distributed | T1595 | Zeek Conn Logs | zeek/conn | Distributed External Port Scanning |
+| AN2070-UDP | T1595 | Zeek Conn Logs | zeek/conn | UDP Port Scanning Detection |
+| AN2070-PostScan-Connection | T1190 | Zeek Conn Logs | zeek/conn | Successful Inbound Connection Post-Scan |
+| AN2070-Correlation | T1595 | Multiple | SIEM | Port Scan Followed by Active Connection and Command Execution |
 | AN2073 | T1598 | Sysmon / Security Logs | Sysmon / Security | Phishing for Information |
 | AN2075 | T1682 | Sysmon / Security Logs | Sysmon / Security | Outbound Data Upload to Public GenAI Services |
 | ANxxxx | T1592 | PowerShell operational logs | Microsoft-Windows-PowerShell/Operational (EID 4104) | PowerShell System Information Gathering via WMI/CIM |
 | ANxxxx | T1592 | Sysmon EID 1 (process_creation) | Microsoft-Windows-Sysmon/Operational | Registry System Information Query |
 | ANxxxx | T1592 | Sysmon EID 1 (process_creation) | Microsoft-Windows-Sysmon/Operational | WMI Command Line System Information Gathering |
-| ANxxxx | T1594 | Sysmon / Security Logs | Sysmon / Security | Web Path Discovery in CDN Access Logs |
-| ANxxxx | T1595 | Sysmon / Security Logs | Sysmon / Security | Distributed External Port Scanning |
-| ANxxxx | T1595 | Sysmon / Security Logs | Sysmon / Security | Low-and-Slow Active Scanning |
 | ANxxxx | T1598 | Sysmon / Security Logs | Sysmon / Security | Phishing for Information from Compromised Internal Account |
 | ANxxxx | T1682 | Sysmon / Security Logs | Sysmon / Security | Connection to Unlisted Public GenAI Services |
 | ANxxxx | T1682 | Sysmon / Security Logs | Sysmon / Security | Outbound Secret Leakage to GenAI Services via Decrypted SSL |
