@@ -16,3 +16,7 @@ rules_dashboard.html
 enterprise-attack-v19.1.xlsx
 Copy of WIndowsSec OCSF mappings.xlsx
 ocsf_mapped_new_sprint.csv
+
+# Ignore IDE / Tool Configs
+.gemini/
+.vscode/

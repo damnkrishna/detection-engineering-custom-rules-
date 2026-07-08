@@ -1,18 +1,19 @@
 # Windows OCSF-Normalized Correlation Ruleset
 
-A comprehensive repository currently containing **179 custom Windows security correlation rules** (out of an expanding scope of 375) mapped to both standard **Sigma** formats and the **OCSF (Open Cybersecurity Schema Framework)** schema. This ruleset is designed to bridge the gap between vendor-specific logging and industry-standard security telemetry schemas, ensuring vendor-agnostic detection engineering.
+A comprehensive repository currently containing **472 custom Windows security detection files** (representing **696 distinct rules** after separating multi-document files: **546 standard Sigma rules** and **150 complex JSON correlation rules**) mapped to both standard **Sigma** formats and the **OCSF (Open Cybersecurity Schema Framework)** schema. This ruleset is designed to bridge the gap between vendor-specific logging and industry-standard security telemetry schemas, ensuring vendor-agnostic detection engineering.
 
 ---
 
-## ?? Repository Structure
+## 📂 Repository Structure
 
 All rules are organized logically by their respective **MITRE ATT&CK Tactic** folders inside the main directory:
 
-`
+```
 window-correlation-rules/
-+-- ocsf_mapped_new_sprint.xlsx  # Status tracking spreadsheet for all 375 analytics
++-- ocsf_mapped_new_sprint.xlsx  # Status tracking spreadsheet for all analytics
 +-- Copy of WIndowsSec OCSF mappings.xlsx # Official reference for standardized OCSF field mappings
 +-- problem.md                   # Verification report detailing schema discrepancies and unmapped usages
++-- json_correlation_rules/      # Complex multi-stage JSON correlation rules (150 rules)
 +-- collection/                  # Data staging, local collection, automated harvesting
 +-- command-and-control/         # Remote access, web service backchannels, encrypted C2
 +-- credential-access/           # LSASS dumping, Kerberoasting, browser credential harvesting
@@ -26,7 +27,7 @@ window-correlation-rules/
 +-- persistence/                 # Web modules (IIS), startup add-ins, account creation
 +-- privilege-escalation/        # Token impersonation, process injection, kernel exploits
 +-- stealth/                     # Indicator removal, attribute tampering, hidden artifacts
-`
+```
 
 ---
 
