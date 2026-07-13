@@ -1,0 +1,133 @@
+title: Repeated Failed Logins
+id: ex-threshold-0001
+description: 5 or more failed logons for one account within 10 minutes
+logsource:
+  product: windows
+detection:
+  selection:
+    EventID: 4625
+  condition: selection
+level: high
+tags:
+  - attack.credential-access
+  - attack.t1110
+
+window:
+  duration: 10m
+threshold:
+  aggregate: count
+  gte: 5
+  by: TargetUserName
+suppression:
+  duration: 10m
+---
+title: PowerShell Credential Dump Kill Chain
+id: ex-sequence-0002
+description: PowerShell execution, credential dumping, LSASS access, then external C2 within 15 minutes
+logsource:
+  product: windows
+detection:
+  powershell:
+    Image|endswith: '\powershell.exe'
+  dumping:
+    CommandLine|contains: 'sekurlsa'
+  lsass_access:
+    TargetImage|endswith: '\lsass.exe'
+  c2_connection:
+    Initiated: 'true'
+    DestinationPort: 443
+level: critical
+tags:
+  - attack.execution
+  - attack.credential-access
+  - attack.command-and-control
+
+sequence:
+  within: 15m
+  by: ComputerName
+  stages:
+    - use: powershell
+    - use: dumping
+    - use: lsass_access
+    - use: c2_connection
+behavior:
+  require_network_indicator: true
+output:
+  message: Credential-dump kill chain with external C2
+  entity_field: ComputerName
+---
+title: EDR PowerShell Plus Firewall C2
+id: ex-correlation-0003
+description: CrowdStrike malicious PowerShell AND Palo Alto outbound C2 for the same entity within 10 minutes
+logsource:
+  category: network
+detection:
+  edr_powershell:
+    signature|contains: 'powershell'
+  firewall_c2:
+    signature|contains: 'command-and-control'
+level: critical
+
+correlation:
+  join: entity_key
+  within: 10m
+  stages:
+    - use: edr_powershell
+      sources: [crowdstrike]
+    - use: firewall_c2
+      sources: [firewall]
+---
+title: Fan-Out To Many Destinations
+id: ex-aggregation-0005
+description: 20 or more unique destination IPs from one source within 30 minutes
+logsource:
+  category: network
+detection:
+  selection:
+    direction: outbound
+  condition: selection
+level: medium
+
+window:
+  duration: 30m
+aggregation:
+  function: distinct_count
+  field: DestinationIp
+  gte: 20
+  by: SourceIp
+---
+title: Authentication Failure Burst
+id: ex-rate-0006
+description: 100 authentication failures per minute
+logsource:
+  product: windows
+detection:
+  selection:
+    EventID: 4625
+  condition: selection
+level: high
+
+window:
+  duration: 1m
+rate:
+  gte: 100
+  per: 1m
+---
+title: Encoded PowerShell Across EDR Vendors
+id: ex-multivendor-0007
+description: One YAML gating CrowdStrike, SentinelOne, Defender and Sysmon telemetry
+logsource:
+  category: process_creation
+detection:
+  selection:
+    Image|endswith: '\powershell.exe'
+    CommandLine|contains: '-enc'
+  condition: selection
+level: high
+
+event_sources: [crowdstrike, sentinelone, defender, sysmon]
+window:
+  duration: 5m
+threshold:
+  aggregate: count
+  gte: 1
