@@ -42,7 +42,8 @@ def process_correlation_file(filepath):
     primary_sig = signatures[0] if signatures else "malicious activity detected"
     primary_tactic = tactics[0] if tactics else "TA0001"
     
-    title = rule_data.get("id", "Correlation Rule")
+    base_name = os.path.splitext(os.path.basename(filepath))[0]
+    title = rule_data.get("id") or rule_data.get("name") or base_name
     desc = rule_data.get("description", title)
     
     # Construct an OCSF Rule representation (to satisfy verify.py and the standard format)
