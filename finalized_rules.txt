@@ -1,0 +1,891 @@
+=== AN8044-T0000-DET8044.md ===
+{
+  "output": {
+    "tags": ["web-shell", "execution", "persistence"],
+    "message": "Web server process wrote a script file and subsequently spawned a shell",
+    "severity": "HIGH",
+    "entityField": "host_id",
+    "mitreTactics": ["TA0001", "TA0002", "TA0003"],
+    "includeFields": ["process_name", "parent_process_name", "command_line", "file_path", "src_ip"],
+    "riskScoreDelta": 3.5,
+    "mitreTechniques": ["T1505.003", "T1059"]
+  },
+  "ruleId": "WEB_SHELL_DEPLOY",
+  "stages": [
+    {
+      "match": {
+        "groups": [],
+        "operator": "AND",
+        "conditions": [
+          { "field": "process_name", "value": null, "values": ["w3wp.exe", "httpd.exe", "nginx.exe", "apache2", "tomcat.exe", "php-cgi.exe"], "operator": "in_list" },
+          { "field": "event_id", "value": "11", "values": [], "operator": "equals" },
+          { "field": "file_extension", "value": null, "values": ["php", "jsp", "asp", "aspx", "ashx", "cfm"], "operator": "in_list" }
+        ]
+      },
+      "minGapMs": 0,
+      "aggregate": null,
+      "stageIndex": 0,
+      "eventSources": [],
+      "withinSeconds": 0,
+      "minOccurrences": 0,
+      "correlation_key": "host_id",
+      "minDistinctCount": 0,
+      "requireDistinctField": null,
+      "excludeSignatureContains": []
+    },
+    {
+      "match": {
+        "groups": [
+          {
+            "groups": [],
+            "operator": "OR",
+            "conditions": [
+              { "field": "process_name", "value": null, "values": ["cmd.exe", "powershell.exe", "pwsh.exe", "bash", "sh", "dash"], "operator": "in_list" },
+              { "field": "command_line", "value": "whoami", "values": [], "operator": "contains" },
+              { "field": "command_line", "value": "net user", "values": [], "operator": "contains" },
+              { "field": "command_line", "value": "ipconfig", "values": [], "operator": "contains" },
+              { "field": "command_line", "value": "ifconfig", "values": [], "operator": "contains" }
+            ]
+          }
+        ],
+        "operator": "AND",
+        "conditions": [
+          { "field": "parent_process_name", "value": null, "values": [], "operator": "equals_field:stage0.process_name" },
+          { "field": "event_id", "value": null, "values": ["1", "4688"], "operator": "in_list" },
+          { "field": "host_id", "value": null, "values": [], "operator": "equals_field:stage0.host_id" }
+        ]
+      },
+      "minGapMs": 0,
+      "aggregate": null,
+      "stageIndex": 1,
+      "eventSources": [],
+      "withinSeconds": 0,
+      "minOccurrences": 0,
+      "correlation_key": "host_id",
+      "minDistinctCount": 0,
+      "requireDistinctField": null,
+      "excludeSignatureContains": ["/opt/datadog-agent", "C:\\Program Files\\"]
+    }
+  ],
+  "window": {
+    "type": "sliding",
+    "minSpanSeconds": 0,
+    "durationSeconds": 1200
+  },
+  "enabled": true,
+  "version": 2,
+  "ruleName": "Web Server Exploitation and Web Shell Execution",
+  "ruleType": "SEQUENCE",
+  "ruleFormat": "IR_v1",
+  "ruleOrigin": "tuned",
+  "description": "Detects a web server process (e.g. w3wp.exe) writing a server-side script file (.php, .aspx) and subsequently spawning a suspicious command shell or discovery command within 20 minutes.",
+  "suppression": {
+    "groupBy": ["host_id"],
+    "durationSeconds": 1200
+  },
+  "eventSources": ["wazuh"],
+  "maxGapSeconds": 0,
+  "correlationKey": "host_id",
+  "behavioralConstraints": null,
+  "maxConcurrentInstances": 0
+}
+
+
+=== AN8051-T0000-DET8051.md ===
+{
+  "output": {
+    "tags": ["initial-access", "discovery", "lateral-movement-prep"],
+    "message": "High-confidence initial access alert followed by a burst of internal host discovery commands",
+    "severity": "CRITICAL",
+    "entityField": "host_id",
+    "mitreTactics": ["TA0001", "TA0007"],
+    "includeFields": ["command_line", "process_name", "user_name"],
+    "riskScoreDelta": 4,
+    "mitreTechniques": ["T1087", "T1033", "T1016", "T1135", "T1482", "T1057", "T1082"]
+  },
+  "ruleId": "INITIAL_ACCESS_THEN_DISCOVERY",
+  "stages": [
+    {
+      "match": {
+        "groups": [
+          {
+            "groups": [],
+            "operator": "OR",
+            "conditions": [
+              { "field": "rule_category", "value": "Initial Access", "values": [], "operator": "equals" },
+              { "field": "signature_name", "value": "successful compromise", "values": [], "operator": "contains" },
+              { "field": "signature_name", "value": "webshell payload", "values": [], "operator": "contains" },
+              { "field": "signature_name", "value": "post-exploitation", "values": [], "operator": "contains" },
+              { "field": "signature_name", "value": "callback", "values": [], "operator": "contains" }
+            ]
+          }
+        ],
+        "operator": "AND",
+        "conditions": []
+      },
+      "minGapMs": 0,
+      "aggregate": null,
+      "stageIndex": 0,
+      "eventSources": [],
+      "withinSeconds": 0,
+      "minOccurrences": 0,
+      "correlation_key": "host_id",
+      "minDistinctCount": 0,
+      "requireDistinctField": null,
+      "excludeSignatureContains": []
+    },
+    {
+      "match": {
+        "groups": [
+          {
+            "groups": [],
+            "operator": "OR",
+            "conditions": [
+              { "field": "command_line", "value": "whoami", "values": [], "operator": "contains" },
+              { "field": "command_line", "value": "net view", "values": [], "operator": "contains" },
+              { "field": "command_line", "value": "ipconfig", "values": [], "operator": "contains" },
+              { "field": "command_line", "value": "arp -a", "values": [], "operator": "contains" },
+              { "field": "command_line", "value": "net user", "values": [], "operator": "contains" },
+              { "field": "command_line", "value": "net localgroup", "values": [], "operator": "contains" },
+              { "field": "command_line", "value": "nltest", "values": [], "operator": "contains" },
+              { "field": "command_line", "value": "systeminfo", "values": [], "operator": "contains" },
+              { "field": "command_line", "value": "tasklist", "values": [], "operator": "contains" }
+            ]
+          }
+        ],
+        "operator": "AND",
+        "conditions": [
+          { "field": "host_id", "value": null, "values": [], "operator": "equals_field:stage0.host_id" },
+          { "field": "process_path", "value": null, "values": ["C:\\Program Files\\Datadog\\Datadog Agent\\bin\\agent.exe", "C:\\Program Files\\CrowdStrike\\CSFalconService.exe", "C:\\Windows\\System32\\sysmon.exe"], "operator": "not_in_list" },
+          { "field": "user_name", "value": null, "values": ["admin_ir_analyst", "svc_vuln_scanner"], "operator": "not_in_list" }
+        ]
+      },
+      "minGapMs": 0,
+      "aggregate": null,
+      "stageIndex": 1,
+      "eventSources": [],
+      "withinSeconds": 0,
+      "minOccurrences": 4,
+      "correlation_key": "host_id",
+      "minDistinctCount": 3,
+      "requireDistinctField": "command_line",
+      "excludeSignatureContains": []
+    }
+  ],
+  "window": {
+    "type": "sliding",
+    "minSpanSeconds": 0,
+    "durationSeconds": 3600
+  },
+  "enabled": true,
+  "version": 2,
+  "ruleName": "Exploitation or phishing entry followed by a burst of internal enumeration",
+  "ruleType": "SEQUENCE",
+  "ruleFormat": "IR_v1",
+  "ruleOrigin": "tuned",
+  "description": "Detects an initial access alert (phishing, RCE, malware) on a host, followed by that same host executing a burst of at least 4 discovery commands (e.g. whoami, net user, systeminfo) of 3 distinct types within 1 hour. This filters out isolated admin commands by requiring a high-volume enumeration script or manual attacker recon phase.",
+  "suppression": {
+    "groupBy": ["host_id"],
+    "durationSeconds": 3600
+  },
+  "eventSources": ["suricata", "wazuh"],
+  "maxGapSeconds": 0,
+  "correlationKey": "host_id",
+  "behavioralConstraints": null,
+  "maxConcurrentInstances": 0
+}
+
+
+=== AN8053-T0000-DET8053.md ===
+{
+  "output": {
+    "tags": ["credential-access", "brute-force", "credential-stuffing"],
+    "message": "Low-and-slow credential stuffing: multiple failed logins followed by a success",
+    "severity": "HIGH",
+    "entityField": "user_name",
+    "mitreTactics": ["TA0006"],
+    "includeFields": ["src_ip", "host_id", "logon_type"],
+    "riskScoreDelta": 3,
+    "mitreTechniques": ["T1110"]
+  },
+  "ruleId": "SLOW_CREDENTIAL_STUFFING",
+  "stages": [
+    {
+      "match": {
+        "groups": [],
+        "operator": "AND",
+        "conditions": [
+          { "field": "event_id", "value": "4625", "values": [], "operator": "equals" },
+          { "field": "logon_type", "value": null, "values": ["3", "10"], "operator": "in_list" },
+          { "field": "user_name", "value": "$", "values": [], "operator": "not_endswith" },
+          { "field": "user_name", "value": null, "values": ["ANONYMOUS LOGON", "SYSTEM"], "operator": "not_in_list" }
+        ]
+      },
+      "minGapMs": 0,
+      "aggregate": null,
+      "stageIndex": 0,
+      "eventSources": [],
+      "withinSeconds": 0,
+      "minOccurrences": 8,
+      "correlation_key": "user_name",
+      "minDistinctCount": 2,
+      "requireDistinctField": "src_ip",
+      "excludeSignatureContains": []
+    },
+    {
+      "match": {
+        "groups": [],
+        "operator": "AND",
+        "conditions": [
+          { "field": "event_id", "value": "4624", "values": [], "operator": "equals" },
+          { "field": "logon_type", "value": null, "values": ["3", "10"], "operator": "in_list" },
+          { "field": "user_name", "value": null, "values": [], "operator": "equals_field:stage0.user_name" },
+          { "field": "src_ip", "value": null, "values": [], "operator": "equals_field:stage0.src_ip" }
+        ]
+      },
+      "minGapMs": 0,
+      "aggregate": null,
+      "stageIndex": 1,
+      "eventSources": [],
+      "withinSeconds": 0,
+      "minOccurrences": 0,
+      "correlation_key": "user_name",
+      "minDistinctCount": 0,
+      "requireDistinctField": null,
+      "excludeSignatureContains": []
+    }
+  ],
+  "window": {
+    "type": "sliding",
+    "minSpanSeconds": 0,
+    "durationSeconds": 86400
+  },
+  "enabled": true,
+  "version": 3,
+  "ruleName": "Low-and-slow credential stuffing: multiple failures then success",
+  "ruleType": "SEQUENCE",
+  "ruleFormat": "IR_v1",
+  "ruleOrigin": "tuned",
+  "description": "Detects 8 or more failed network/RDP logins for a single account sourced from at least 2 distinct IPs, followed by a successful login for that same account from one of the attacking IPs over a 24-hour period.",
+  "suppression": {
+    "groupBy": ["user_name"],
+    "durationSeconds": 3600
+  },
+  "eventSources": ["wazuh"],
+  "maxGapSeconds": 0,
+  "correlationKey": "user_name",
+  "behavioralConstraints": null,
+  "maxConcurrentInstances": 0
+}
+
+
+=== AN8055-T1558-DET8055.md ===
+{
+  "output": {
+    "tags": ["credential-access", "kerberos", "active-directory"],
+    "message": "SPN Enumeration followed by RC4 Kerberos TGS Requests (Kerberoasting)",
+    "severity": "HIGH",
+    "entityField": "user_name",
+    "mitreTactics": ["TA0006"],
+    "includeFields": ["user_name", "service_name", "ticket_encryption_type", "src_ip"],
+    "riskScoreDelta": 3.0,
+    "mitreTechniques": ["T1558.003"]
+  },
+  "ruleId": "KERBEROASTING",
+  "stages": [
+    {
+      "match": {
+        "groups": [
+          {
+            "groups": [],
+            "operator": "OR",
+            "conditions": [
+              { "field": "process_name", "value": "setspn.exe", "values": [], "operator": "equals" },
+              { "field": "command_line", "value": "serviceprincipalname", "values": [], "operator": "contains" },
+              { "field": "command_line", "value": "getuserspns", "values": [], "operator": "contains" }
+            ]
+          }
+        ],
+        "operator": "AND",
+        "conditions": []
+      },
+      "minGapMs": 0,
+      "aggregate": null,
+      "stageIndex": 0,
+      "eventSources": [],
+      "withinSeconds": 0,
+      "minOccurrences": 0,
+      "correlation_key": "user_name",
+      "minDistinctCount": 0,
+      "requireDistinctField": null,
+      "excludeSignatureContains": []
+    },
+    {
+      "match": {
+        "groups": [],
+        "operator": "AND",
+        "conditions": [
+          { "field": "event_id", "value": "4769", "values": [], "operator": "equals" },
+          { "field": "ticket_encryption_type", "value": null, "values": ["0x17", "23"], "operator": "in_list" },
+          { "field": "service_name", "value": "krbtgt", "values": [], "operator": "not_equals" },
+          { "field": "user_name", "value": "$", "values": [], "operator": "not_endswith" },
+          { "field": "service_name", "value": "$", "values": [], "operator": "not_endswith" },
+          { "field": "user_name", "value": null, "values": [], "operator": "equals_field:stage0.user_name" },
+          { "field": "src_ip", "value": null, "values": [], "operator": "not_in_list" },
+          { "field": "service_name", "value": null, "values": [], "operator": "not_in_list" }
+        ]
+      },
+      "minGapMs": 0,
+      "aggregate": null,
+      "stageIndex": 1,
+      "eventSources": [],
+      "withinSeconds": 0,
+      "minOccurrences": 10,
+      "correlation_key": "user_name",
+      "minDistinctCount": 5,
+      "requireDistinctField": "service_name",
+      "excludeSignatureContains": []
+    }
+  ],
+  "window": {
+    "type": "sliding",
+    "minSpanSeconds": 0,
+    "durationSeconds": 1800
+  },
+  "enabled": true,
+  "version": 1,
+  "ruleName": "Kerberos TGS requests for service accounts — offline hash cracking prep",
+  "ruleType": "SEQUENCE",
+  "ruleFormat": "IR_v1",
+  "ruleOrigin": "tuned",
+  "description": "Detects an attacker enumerating SPNs (e.g., via setspn.exe or LDAP) and subsequently requesting multiple RC4 Kerberos TGS tickets (Event 4769) for different services under the same user account.",
+  "suppression": {
+    "groupBy": ["user_name"],
+    "durationSeconds": 3600
+  },
+  "eventSources": ["wazuh"],
+  "maxGapSeconds": 0,
+  "correlationKey": "user_name",
+  "behavioralConstraints": null,
+  "maxConcurrentInstances": 0
+}
+
+
+=== AN8063-T0000-DET8063.md ===
+{
+  "output": {
+    "tags": ["persistence", "execution"],
+    "message": "Execution followed by persistence mechanism installation",
+    "severity": "HIGH",
+    "entityField": "host_id",
+    "mitreTactics": ["TA0002", "TA0003"],
+    "includeFields": ["process_id", "process_path", "registry_key_path", "user_name"],
+    "riskScoreDelta": 3,
+    "mitreTechniques": ["T1543", "T1547", "T1053"]
+  },
+  "ruleId": "PERSISTENCE_AFTER_EXEC",
+  "stages": [
+    {
+      "match": {
+        "groups": [],
+        "operator": "AND",
+        "conditions": [
+          { "field": "tactic", "value": null, "values": ["TA0002"], "operator": "in_list" },
+          { "field": "parent_process_name", "value": null, "values": ["cmd.exe", "powershell.exe", "wscript.exe", "cscript.exe", "mshta.exe", "winword.exe", "excel.exe", "pwsh.exe"], "operator": "in_list" }
+        ]
+      },
+      "minGapMs": 0,
+      "aggregate": null,
+      "stageIndex": 0,
+      "eventSources": [],
+      "withinSeconds": 0,
+      "minOccurrences": 0,
+      "correlation_key": "host_id",
+      "minDistinctCount": 0,
+      "requireDistinctField": null,
+      "excludeSignatureContains": []
+    },
+    {
+      "match": {
+        "groups": [
+          {
+            "groups": [],
+            "operator": "OR",
+            "conditions": [
+              { "field": "event_id", "value": null, "values": ["4698", "4702", "7045"], "operator": "in_list" },
+              { "field": "registry_key_path", "value": "\\Run", "values": [], "operator": "contains" },
+              { "field": "registry_key_path", "value": "\\RunOnce", "values": [], "operator": "contains" },
+              { "field": "registry_key_path", "value": "\\Services", "values": [], "operator": "contains" },
+              { "field": "signature_name", "value": "service install", "values": [], "operator": "contains" }
+            ]
+          }
+        ],
+        "operator": "AND",
+        "conditions": [
+          { "field": "parent_process_id", "value": null, "values": [], "operator": "equals_field:stage0.process_id" }
+        ]
+      },
+      "minGapMs": 0,
+      "aggregate": null,
+      "stageIndex": 1,
+      "eventSources": [],
+      "withinSeconds": 0,
+      "minOccurrences": 0,
+      "correlation_key": "host_id",
+      "minDistinctCount": 0,
+      "requireDistinctField": null,
+      "excludeSignatureContains": ["msiexec.exe", "setup.exe", "GoogleUpdate", "AdobeARM", "OneDriveSetup"]
+    }
+  ],
+  "window": {
+    "type": "sliding",
+    "minSpanSeconds": 0,
+    "durationSeconds": 900
+  },
+  "enabled": true,
+  "version": 3,
+  "ruleName": "Execution followed by persistence mechanism installation",
+  "ruleType": "SEQUENCE",
+  "ruleFormat": "IR_v1",
+  "ruleOrigin": "tuned",
+  "description": "Detects an execution event from a common dropper parent followed by a persistence mechanism (scheduled task, registry run key, service creation) spawned by the exact same process within 15 minutes.",
+  "suppression": {
+    "groupBy": ["host_id"],
+    "durationSeconds": 300
+  },
+  "eventSources": ["wazuh"],
+  "maxGapSeconds": 0,
+  "correlationKey": "host_id",
+  "behavioralConstraints": null,
+  "maxConcurrentInstances": 0
+}
+
+
+=== AN8064-T1053-DET8064.md ===
+{
+  "output": {
+    "tags": ["persistence", "execution"],
+    "message": "Scheduled task or malicious service installed for backdoor access",
+    "severity": "HIGH",
+    "entityField": "host_id",
+    "mitreTactics": ["TA0003", "TA0002"],
+    "includeFields": ["host_id", "user_name", "process_name", "command_line"],
+    "riskScoreDelta": 3.0,
+    "mitreTechniques": ["T1053", "T1543"]
+  },
+  "ruleId": "SCHEDULED_TASK_PERSISTENCE",
+  "stages": [
+    {
+      "match": {
+        "groups": [
+          {
+            "groups": [],
+            "operator": "OR",
+            "conditions": [
+              { "field": "event_id", "value": null, "values": ["4698", "4702", "7045"], "operator": "in_list" },
+              { "field": "command_line", "value": "schtasks /create", "values": [], "operator": "contains" },
+              { "field": "command_line", "value": "at.exe", "values": [], "operator": "contains" },
+              { "field": "command_line", "value": "sc create", "values": [], "operator": "contains" },
+              { "field": "command_line", "value": "sc.exe create", "values": [], "operator": "contains" },
+              { "field": "signature_name", "value": "new service", "values": [], "operator": "contains" },
+              { "field": "signature_name", "value": "crontab", "values": [], "operator": "contains" }
+            ]
+          }
+        ],
+        "operator": "AND",
+        "conditions": []
+      },
+      "minGapMs": 0,
+      "aggregate": null,
+      "stageIndex": 0,
+      "eventSources": [],
+      "withinSeconds": 0,
+      "minOccurrences": 0,
+      "correlation_key": "host_id",
+      "minDistinctCount": 0,
+      "requireDistinctField": null,
+      "excludeSignatureContains": []
+    },
+    {
+      "match": {
+        "groups": [
+          {
+            "groups": [],
+            "operator": "OR",
+            "conditions": [
+              { "field": "process_name", "value": null, "values": ["svchost.exe", "SearchIndexer.exe", "taskhostw.exe", "sppsvc.exe", "wininit.exe"], "operator": "not_in_list" }
+            ]
+          }
+        ],
+        "operator": "AND",
+        "conditions": [
+          { "field": "host_id", "value": null, "values": [], "operator": "equals_field:stage0.host_id" },
+          { "field": "parent_process_name", "value": null, "values": ["svchost.exe", "services.exe", "taskeng.exe", "cron", "crond", "atd"], "operator": "in_list" },
+          { "field": "parent_process_name", "value": null, "values": ["msiexec.exe", "setup.exe", "sccm.exe", "TrustedInstaller.exe"], "operator": "not_in_list" }
+        ]
+      },
+      "minGapMs": 0,
+      "aggregate": null,
+      "stageIndex": 1,
+      "eventSources": [],
+      "withinSeconds": 0,
+      "minOccurrences": 0,
+      "correlation_key": "host_id",
+      "minDistinctCount": 0,
+      "requireDistinctField": null,
+      "excludeSignatureContains": []
+    }
+  ],
+  "window": {
+    "type": "sliding",
+    "minSpanSeconds": 0,
+    "durationSeconds": 3600
+  },
+  "enabled": true,
+  "version": 2,
+  "ruleName": "Scheduled task or malicious service installed followed by execution",
+  "ruleType": "SEQUENCE",
+  "ruleFormat": "IR_v1",
+  "ruleOrigin": "tuned",
+  "description": "Detects the creation of a Scheduled Task or Service (Event ID 4698, 7045, or schtasks/sc commands) followed by an unexpected child process executing directly from the Task Scheduler (svchost.exe/taskeng.exe) or Service Manager (services.exe) on the same host within 1 hour.",
+  "suppression": {
+    "groupBy": ["host_id", "process_name"],
+    "durationSeconds": 3600
+  },
+  "eventSources": ["wazuh"],
+  "maxGapSeconds": 3600,
+  "correlationKey": "host_id",
+  "behavioralConstraints": null,
+  "maxConcurrentInstances": 0
+}
+
+
+=== AN8066-T0000-DET8066.md ===
+{
+  "output": {
+    "tags": ["defense-evasion", "execution"],
+    "message": "AV/EDR tampering or log clearing followed by suspicious execution",
+    "severity": "HIGH",
+    "entityField": "host_id",
+    "mitreTactics": ["TA0005", "TA0002"],
+    "includeFields": ["host_id", "user_name", "process_name", "command_line"],
+    "riskScoreDelta": 3.0,
+    "mitreTechniques": ["T1562.001", "T1070.001"]
+  },
+  "ruleId": "DEFENCE_EVASION_THEN_EXEC",
+  "stages": [
+    {
+      "match": {
+        "groups": [
+          {
+            "groups": [],
+            "operator": "OR",
+            "conditions": [
+              { "field": "event_id", "value": null, "values": ["1102", "104"], "operator": "in_list" },
+              { "field": "command_line", "value": "wevtutil", "values": [], "operator": "contains" },
+              { "field": "command_line", "value": "Clear-EventLog", "values": [], "operator": "contains" },
+              { "field": "command_line", "value": "Remove-EventLog", "values": [], "operator": "contains" },
+              { "field": "command_line", "value": "stop windefend", "values": [], "operator": "contains" },
+              { "field": "command_line", "value": "disable windefend", "values": [], "operator": "contains" },
+              { "field": "command_line", "value": "Set-MpPreference -DisableRealtimeMonitoring", "values": [], "operator": "contains" },
+              { "field": "command_line", "value": "amsiInitFailed", "values": [], "operator": "contains" },
+              { "field": "signature_name", "value": "defender disabled", "values": [], "operator": "contains" },
+              { "field": "signature_name", "value": "tamper protection bypassed", "values": [], "operator": "contains" }
+            ]
+          }
+        ],
+        "operator": "AND",
+        "conditions": []
+      },
+      "minGapMs": 0,
+      "aggregate": null,
+      "stageIndex": 0,
+      "eventSources": [],
+      "withinSeconds": 0,
+      "minOccurrences": 0,
+      "correlation_key": "host_id",
+      "minDistinctCount": 0,
+      "requireDistinctField": null,
+      "excludeSignatureContains": []
+    },
+    {
+      "match": {
+        "groups": [
+          {
+            "groups": [],
+            "operator": "OR",
+            "conditions": [
+              { "field": "process_name", "value": null, "values": ["powershell.exe", "pwsh.exe", "cmd.exe", "wscript.exe", "cscript.exe", "mshta.exe", "rundll32.exe", "regsvr32.exe", "certutil.exe"], "operator": "in_list" }
+            ]
+          }
+        ],
+        "operator": "AND",
+        "conditions": [
+          { "field": "host_id", "value": null, "values": [], "operator": "equals_field:stage0.host_id" },
+          { "field": "user_name", "value": null, "values": [], "operator": "equals_field:stage0.user_name" },
+          { "field": "parent_process_name", "value": null, "values": ["msiexec.exe", "setup.exe", "sccm.exe"], "operator": "not_in_list" },
+          { "field": "process_name", "value": null, "values": ["HealthService.exe", "TaniumClient.exe", "sysmon.exe"], "operator": "not_in_list" }
+        ]
+      },
+      "minGapMs": 0,
+      "aggregate": null,
+      "stageIndex": 1,
+      "eventSources": [],
+      "withinSeconds": 0,
+      "minOccurrences": 0,
+      "correlation_key": "host_id",
+      "minDistinctCount": 0,
+      "requireDistinctField": null,
+      "excludeSignatureContains": []
+    }
+  ],
+  "window": {
+    "type": "sliding",
+    "minSpanSeconds": 0,
+    "durationSeconds": 2700
+  },
+  "enabled": true,
+  "version": 2,
+  "ruleName": "AV/EDR tampering or log clearing before malicious execution",
+  "ruleType": "SEQUENCE",
+  "ruleFormat": "IR_v1",
+  "ruleOrigin": "tuned",
+  "description": "Detects host-level defense evasion (Event ID 1102/104 log clearing, disabling Defender, disabling AMSI) immediately followed by suspicious execution (powershell, cmd, LOLBins) on the same host. Excludes authorized SCCM installers.",
+  "suppression": {
+    "groupBy": ["host_id"],
+    "durationSeconds": 3600
+  },
+  "eventSources": ["wazuh"],
+  "maxGapSeconds": 300,
+  "correlationKey": "host_id",
+  "behavioralConstraints": null,
+  "maxConcurrentInstances": 0
+}
+
+
+=== AN8074-T0000-DET8074.md ===
+{
+  "output": {
+    "tags": ["supply-chain", "c2"],
+    "message": "Trusted software process performing suspicious network/C2 activity",
+    "severity": "HIGH",
+    "entityField": "host_id",
+    "mitreTactics": ["TA0002", "TA0011", "TA0007"],
+    "includeFields": ["host_id", "user_name", "process_name", "process_id", "process_guid"],
+    "riskScoreDelta": 4.0,
+    "mitreTechniques": ["T1055", "T1036", "T1071"]
+  },
+  "ruleId": "SUPPLY_CHAIN_INDICATOR",
+  "stages": [
+    {
+      "match": {
+        "groups": [
+          {
+            "groups": [],
+            "operator": "OR",
+            "conditions": [
+              { "field": "process_name", "value": null, "values": ["svchost.exe", "msiexec.exe", "wuauclt.exe", "TrustedInstaller.exe", "sigcheck.exe"], "operator": "in_list" },
+              { "field": "signature_name", "value": "unexpected outbound", "values": [], "operator": "contains" },
+              { "field": "signature_name", "value": "unusual parent", "values": [], "operator": "contains" },
+              { "field": "signature_name", "value": "trusted process anomaly", "values": [], "operator": "contains" }
+            ]
+          }
+        ],
+        "operator": "AND",
+        "conditions": []
+      },
+      "minGapMs": 0,
+      "aggregate": null,
+      "stageIndex": 0,
+      "eventSources": [],
+      "withinSeconds": 0,
+      "minOccurrences": 0,
+      "correlation_key": "process_guid",
+      "minDistinctCount": 0,
+      "requireDistinctField": null,
+      "excludeSignatureContains": []
+    },
+    {
+      "match": {
+        "groups": [
+          {
+            "groups": [],
+            "operator": "OR",
+            "conditions": [
+              { "field": "signature_name", "value": "c2 traffic", "values": [], "operator": "contains" },
+              { "field": "signature_name", "value": "c2 beacon", "values": [], "operator": "contains" },
+              { "field": "signature_name", "value": "c&c", "values": [], "operator": "contains" },
+              { "field": "signature_name", "value": "malicious callback", "values": [], "operator": "contains" },
+              { "field": "signature_name", "value": "cobalt strike", "values": [], "operator": "contains" },
+              { "field": "signature_name", "value": "metasploit", "values": [], "operator": "contains" },
+              { "field": "signature_name", "value": "empire", "values": [], "operator": "contains" }
+            ]
+          }
+        ],
+        "operator": "AND",
+        "conditions": [
+          { "field": "process_id", "value": null, "values": [], "operator": "equals_field:stage0.process_id" },
+          { "field": "process_guid", "value": null, "values": [], "operator": "equals_field:stage0.process_guid" },
+          { "field": "host_id", "value": null, "values": [], "operator": "equals_field:stage0.host_id" }
+        ]
+      },
+      "minGapMs": 0,
+      "aggregate": null,
+      "stageIndex": 1,
+      "eventSources": [],
+      "withinSeconds": 0,
+      "minOccurrences": 0,
+      "correlation_key": "process_guid",
+      "minDistinctCount": 0,
+      "requireDistinctField": null,
+      "excludeSignatureContains": []
+    }
+  ],
+  "window": {
+    "type": "sliding",
+    "minSpanSeconds": 0,
+    "durationSeconds": 1800
+  },
+  "enabled": true,
+  "version": 2,
+  "ruleName": "Trusted software process performing suspicious network/C2 activity",
+  "ruleType": "SEQUENCE",
+  "ruleFormat": "IR_v1",
+  "ruleOrigin": "tuned",
+  "description": "Detects a trusted process (e.g., svchost, msiexec) establishing a high-confidence C2/beaconing connection. Correlated via strict process_id and host_id linkage to eliminate coincidence.",
+  "suppression": {
+    "groupBy": ["host_id", "process_guid"],
+    "durationSeconds": 3600
+  },
+  "eventSources": ["wazuh"],
+  "maxGapSeconds": 1800,
+  "correlationKey": "process_guid",
+  "behavioralConstraints": null,
+  "maxConcurrentInstances": 0
+}
+
+
+=== AN8078-T1091-DET8078.md ===
+{
+  "output": {
+    "tags": ["usb", "removable-media", "dropper"],
+    "message": "USB/removable media connected → executable dropped → execution",
+    "severity": "HIGH",
+    "entityField": "host_id",
+    "mitreTactics": ["TA0002"],
+    "includeFields": ["device_serial", "file_path", "file_hash", "process_id"],
+    "riskScoreDelta": 3,
+    "mitreTechniques": ["T1091", "T1204"]
+  },
+  "ruleId": "USB_MALWARE_INJECTION",
+  "stages": [
+    {
+      "match": {
+        "groups": [
+          {
+            "groups": [],
+            "operator": "OR",
+            "conditions": [
+              { "field": "signature_name", "value": "usb device connected", "values": [], "operator": "contains" },
+              { "field": "signature_name", "value": "removable media mounted", "values": [], "operator": "contains" },
+              { "field": "device_class", "value": "removable_storage", "values": [], "operator": "equals" },
+              { "field": "signature_name", "value": "autorun.inf detected", "values": [], "operator": "contains" }
+            ]
+          }
+        ],
+        "operator": "AND",
+        "conditions": []
+      },
+      "minGapMs": 0,
+      "aggregate": null,
+      "stageIndex": 0,
+      "eventSources": [],
+      "withinSeconds": 0,
+      "minOccurrences": 0,
+      "correlation_key": "device_serial",
+      "minDistinctCount": 0,
+      "requireDistinctField": null,
+      "excludeSignatureContains": []
+    },
+    {
+      "match": {
+        "groups": [
+          {
+            "groups": [],
+            "operator": "OR",
+            "conditions": [
+              { "field": "file_extension", "value": null, "values": ["exe", "dll", "bat", "ps1", "vbs", "scr"], "operator": "in_list" },
+              { "field": "signature_name", "value": "file created on removable media", "values": [], "operator": "contains" },
+              { "field": "signature_name", "value": "file written to removable media", "values": [], "operator": "contains" }
+            ]
+          }
+        ],
+        "operator": "AND",
+        "conditions": [
+          { "field": "source_volume_type", "value": "removable", "values": [], "operator": "equals" }
+        ]
+      },
+      "minGapMs": 0,
+      "aggregate": null,
+      "stageIndex": 1,
+      "eventSources": [],
+      "withinSeconds": 0,
+      "minOccurrences": 0,
+      "correlation_key": "device_serial",
+      "minDistinctCount": 0,
+      "requireDistinctField": "file_path",
+      "excludeSignatureContains": []
+    },
+    {
+      "match": {
+        "groups": [
+          {
+            "groups": [],
+            "operator": "OR",
+            "conditions": [
+              { "field": "process_path", "value": null, "values": [], "operator": "equals_field:stage1.file_path" },
+              { "field": "command_line", "value": null, "values": [], "operator": "contains_field:stage1.file_path" }
+            ]
+          }
+        ],
+        "operator": "AND",
+        "conditions": [
+          { "field": "tactic", "value": null, "values": ["TA0002"], "operator": "in_list" }
+        ]
+      },
+      "minGapMs": 0,
+      "aggregate": null,
+      "stageIndex": 2,
+      "eventSources": [],
+      "withinSeconds": 0,
+      "minOccurrences": 0,
+      "correlation_key": "device_serial",
+      "minDistinctCount": 0,
+      "requireDistinctField": null,
+      "excludeSignatureContains": []
+    }
+  ],
+  "window": {
+    "type": "sliding",
+    "minSpanSeconds": 0,
+    "durationSeconds": 900
+  },
+  "enabled": true,
+  "version": 2,
+  "ruleName": "USB/removable media connected → executable dropped → execution",
+  "ruleType": "SEQUENCE",
+  "ruleFormat": "IR_v1",
+  "ruleOrigin": "tuned",
+  "description": "Detects a USB or removable media device being connected, followed by an executable-type file being written to that same device's volume, followed by execution of that specific file — correlated by device serial and file path within a 15-minute window.",
+  "suppression": {
+    "groupBy": ["host_id", "device_serial"],
+    "durationSeconds": 300
+  },
+  "eventSources": ["wazuh"],
+  "maxGapSeconds": 0,
+  "correlationKey": "device_serial",
+  "behavioralConstraints": null,
+  "maxConcurrentInstances": 0
+}
+
+

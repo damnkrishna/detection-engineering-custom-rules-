@@ -1,0 +1,244 @@
+Rule Verification Notes
+-----------------------
+
+1 NIDS_SCAN_ZEEK_ESTABLISH
+  - requireRemoteAuth : True
+  - requireExternalSrc : False
+  - } => Both needs to be True. for External IP ?
+
+2 ZEEK_DGA_HIDS_LOLBIN
+  - CorrelationKey : entity-key -> hostname
+  - GroupBy [ ] -> Entity-key
+
+3 SLOW_LATERAL_NEW_HOSTS
+  - contains -> equals for 4624
+  - groupby : [ ] -> 'username' 
+  - requireDistinctField : entity-key -> hostname/username (Not that Imp)
+
+4 BEACONING_FIXED_INTERVAL
+  - groupby : [ ] -> "entity-key"
+  - -> Can add More known good Signatures
+
+5 Insider_Role_Data_Abuse.
+  - contains -> equal for 4624
+  - groupby : [ ] -> 'username'
+  - -> add excludeSignatureContains.
+
+6 STAGED_CLOUD_UPLOAD
+  - contains -> equal for "zip", "tar"
+  - entity-key -> hostname (Will Work on IP as-well)
+
+7 KERBEROS_DELEGATION_ABUSE
+  - Entity-key -> Username
+
+8 SERVICE_ACCOUNT_INTERACTIVE_LOGON
+  - requireRemoteAuth : true -> false (local, not Remote)
+  - ( Not a big issue.)
+
+9 PPID_SPOOF_EXEC
+  - entity-key -> hostname. : Correlation-key.
+
+10 INACTIVE_ACCOUNT_REUSE
+  - contains -> equal for 4722
+  - requireRemoteAuth -> True -> false.
+
+11 WMI_SUBSCRIPTION_PERSIST
+  - correlationKey : entity-key -> hostname
+  - contain -> equal for 5860
+
+12 LOLBIN_CHAIN_MULTI_HOP
+  - entity-key -> hostname
+
+13 USER_DISTINCT_SHARE_SWEEP
+  - contains -> equal for 4663
+  - groupby -> username
+
+
+15 OFFHOURS_ADMIN_LATERAL
+  - contains 4624 -> WindowId / Equal.
+  - distinct_count -> Perfect.
+
+16 NIDS_C2_HIDS_CRED_DUMP
+  - -> Less Detection details Present
+
+17 ZEEK_LARGE_TRANSFER_HIDS_COLLECTION
+18 NIDS_EXPLOIT_HIDS_PRIV
+  - [Note for 17 & 18]: NIDS Rules Lack Signature
+
+19 WMI_PS_LATERAL
+  - contains -> equal/Window Id
+  - correlationKey -> entity-key = username
+
+
+
+21 LOGON_MULTI_SUBNET_RAPID
+  - contains -> equal/Window Id
+  - groupBy : [ ] -> username (*IMP*)
+
+
+
+23 SHADOW_CREDENTIALS_ADCS
+  - contains -> equal/Windows ID
+  - correlation-Key -> entity-key = username
+
+
+25 BITS_JOB_ABUSE
+  - contains -> equal/Windows-ID
+
+
+
+28 ZEEK_CONN_THEN_HIDS_EXEC
+  - (Stage 2 Withinseconds : 0 -> 600)
+
+29 ASREP_ROASTING
+  - contains -> equal/Windows-ID
+
+
+
+31 REVERSE_SHELL_C2
+  - contains -> equal/Windows-ID
+
+32 BEACON_THEN_PAYLOAD
+  - withinSeconds : 0 -> timing can be added.
+
+33 MALWARE_PROPAGATION
+  - -> Stage 1 -> no signature detection
+
+34 PROCESS_INJECTION_CHAIN
+  - withinSeconds : 0 -> 300
+
+35 USB_MALWARE_INJECTION
+  - -> High Chance of false Positive
+
+36 WIPER_MALWARE
+  - contains -> equal/Window_ID (Rule a little Broad).
+
+37 NETWORK_APPLICANCE_EXPLOIT
+  - withinSeconds : 0 -> 1800 (stage 2)
+
+
+
+39 API_KILL_CHAIN
+  - -> contains -> equal/Window ID
+
+
+
+43 MULTI_STAGE_EXFIL
+  - contains -> equal/Window_ID 
+  - groupBy -> Entity-key
+
+44 DATA_EXFIL_PREP
+  - GroupBy -> Entity-key
+
+45 MALICIOUS_POWERSHELL
+  - GroupBy -> Entity-key
+
+46 DEFENSE_EVASION_PERSISTENCE
+  - contains -> equal (Window_ID)
+  - GroupBy -> Entity-key
+
+47 DEFENSE_EVASION_THEN_EXEC
+  - contains -> equal (Windows_ID)
+  - GroupBy -> Entity-key
+
+48 REGISTRY_PERSISTENCE
+  - contains -> equal (Windows_ID)
+  - GroupBy -> entity-key
+
+49 SCHEDULED_TASK_PERSISTENCE
+  - -> contains -> equal
+  - -> groupBy -> Entity-key
+
+50 PERSISTENCE_AFTER_EXEC
+  - -> contains -> equal
+  - -> groupBy -> Entity-key
+
+51 SCATTERED_SPIDER_PATTERN
+  - Correlation-Key : user / account_name (*IMP*)
+  - contains -> equal
+
+52 ACCOUNT_CREATION_ESCALATION
+  - contains -> equal
+  - correlationKey -> username
+
+53 PRIVILEGE_ESCALATION_SEQ
+  - contains -> equal
+  - correlationKey -> username
+
+54 LATERAL_MOVEMENT_USER
+  - -> contains -> equal
+  - GroupBy -> username (*IMP*)
+
+55 CREDENTIAL_DUMP_LATERAL
+  - contains -> equal
+  - correlationKey -> username
+
+56 DYSYNC_ATTACK
+  - -> Groupby: -> username
+  
+
+57 SLOW_CREDENTIAL_STUFFING
+  - -> GroupBy -> username (**)
+  - -> contain -> equal.
+  - -> correlationKey: username
+
+58 GOLDEN_TICKET
+  - -> contains -> equal
+
+59 BRUTE_FORCE_RDPSSH
+  - -> contains -> equal
+  - -> GroupBy [Username]
+
+60 KERBEROASTING
+  - -> contains -> equal
+
+61 PASS_THE_HASH
+  - -> contains -> equal.
+
+62 INITIAL_ACCESS_THEN_DISCOVERY
+  - -> contains -> equal
+
+63 NETWORK_DISCOVERY_THEN_LATERAL
+  - -> contains -> equal
+
+64 INTERNAL_PORT_SCAN
+  - groupBy -> src_ip
+
+65 SAME_ATTACKER_MULTI_TARGET
+  - groupBy -> src_ip
+
+66 RECON_TO_EXPLOIT
+  - -> distinct entity_key or Entity_key (Choose One)
+  - -> GroupBy : entity_key
+
+67 CLICKFIX_FAKE_CAPTCHA
+  - GroupBy -> entity-key
+
+68 SQL_Injection_EXFIL
+  - -> value : Select (Remove)
+  - -> GroupBy : entity-key
+
+69 WEB_SHELL_DEPLOY
+  - -> contains -> equal
+  - -> GroupBy : entity-key
+  - -> Value : "POST", "Apache" (Remove)
+
+70 EXPLOITATION_THEN_C2
+  - -> GroupBy : entity-key
+
+71 MULTI_SOURCE_EXPLOITATION
+  - -> GroupBy : entity-key
+
+72 IOT_EXPLOIT_PAYLOAD_DELIVERY
+  - -> GroupBy : entity-key
+
+73 CISA_KEV_EXPLOIT
+  - -> GroupBy : entity-key -> Threshold (Needs Modification)
+
+74 RMM_TOOL_ABUSE
+  - -> GroupBy : entity-key
+
+
+
+* Have To delete pipeline-Heartbeat-4624
+* Note: Number 13 was repeated in notes (RARE_PROC_NET_OUTBOUND)

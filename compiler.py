@@ -45,40 +45,41 @@ def map_sigma_to_ocsf_yaml(sigma_yaml):
     return '\n'.join(out_lines)
 
 def extract_values_from_detection(detection_yaml):
-    # Very crude but effective value extractor
-    # Look for patterns like: process.cmd_line|contains: 'foo'
-    # or lists under it.
     extracted = {}
     lines = detection_yaml.split('\n')
     current_key = None
+    captured_for_this_key = False
     
     for line in lines:
         if 'condition:' in line:
             break
-        
-        # Match "key: value" or "key|modifier: value"
+            
         m = re.match(r'^\s*-?\s*([a-zA-Z0-9_\.]+)(?:\|[a-zA-Z0-9_]+)?:\s*[\'"]?([^\'"\n]+)[\'"]?', line)
         if m:
-            key = m.group(1)
-            val = m.group(2)
-            if key not in extracted:
-                extracted[key] = val
+            k = m.group(1)
+            v = m.group(2)
+            if k not in extracted: extracted[k] = []
+            extracted[k].append(v)
             continue
             
-        # Match "key:"
         m2 = re.match(r'^\s*-?\s*([a-zA-Z0-9_\.]+)(?:\|[a-zA-Z0-9_]+)?:\s*$', line)
         if m2:
             current_key = m2.group(1)
+            captured_for_this_key = False
             continue
             
-        # Match list item "- 'value'"
         m3 = re.match(r'^\s*-\s*[\'"]?([^\'"\n]+)[\'"]?', line)
         if m3 and current_key:
-            val = m3.group(1)
-            if current_key not in extracted:
-                extracted[current_key] = val
+            if not captured_for_this_key:
+                val = m3.group(1)
+                if current_key not in extracted: extracted[current_key] = []
+                extracted[current_key].append(val)
+                captured_for_this_key = True
                 
-    return extracted
+    final_extracted = {}
+    for k, vlist in extracted.items():
+        final_extracted[k] = " ".join(vlist)
+    return final_extracted
 
 def generate_telemetry_json(uid, title, ocsf_cls, cat, test_case, expected_alert, extracted_vals, is_malformed=False, is_coercion=False, is_benign=False, time_offset=0):
     # Start with a base payload based on OCSF class
@@ -232,11 +233,12 @@ def process_file(filepath):
         title_match = re.search(r'title:\s*[\'"]?([^\'"\n]+)[\'"]?', s_yaml)
         title = title_match.group(1).strip() if title_match else "Unknown Title"
         
+        uid = str(uuid.uuid4())
         id_match = re.search(r'id:\s*[\'"]?([^\'"\n]+)[\'"]?', s_yaml)
-        uid = id_match.group(1).strip() if id_match else str(uuid.uuid4())
-        if not re.match(r'^[a-fA-F0-9\-]{36}$', uid):
-            uid = str(uuid.uuid4())
-            new_content = new_content.replace(f"id: {id_match.group(1) if id_match else ''}", f"id: '{uid}'")
+        if id_match:
+            old_id = id_match.group(1)
+            # Find the exact id: line and replace it in new_content
+            new_content = re.sub(rf'id:\s*[\'"]?{re.escape(old_id)}[\'"]?', f"id: {uid}", new_content, count=1)
             
         cat_match = re.search(r'category:\s*([^\n]+)', s_yaml)
         cat = cat_match.group(1).strip() if cat_match else "process_creation"
