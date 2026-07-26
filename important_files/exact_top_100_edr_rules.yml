@@ -1,0 +1,4863 @@
+title: Suspicious Browser Credential Store Access via CLI (AN0105-A)
+id: 5101f3bb-c22d-402d-bcfe-5d5af2713990
+status: experimental
+description: Detects command-line operations attempting to copy, compress, or access web browser credential and cookie databases, indicating potential credential theft.
+author: Krishna Gupta
+date: 2026-06-12
+logsource:
+    category: process_creation
+    product: windows
+detection:
+    selection_tools_image:
+        Image|endswith:
+            - '\cmd.exe'
+            - '\powershell.exe'
+            - '\pwsh.exe'
+            - '\xcopy.exe'
+            - '\robocopy.exe'
+            - '\tar.exe'
+            - '\7z.exe'
+    selection_tools_original:
+        OriginalFileName:
+            - 'Cmd.Exe'
+            - 'PowerShell.EXE'
+            - 'pwsh.dll'
+            - 'xcopy.exe'
+            - 'robocopy.exe'
+            - 'tar.exe'
+            - '7z.exe'
+    selection_chrome_login:
+        CommandLine|contains|all:
+            - '\Google\Chrome\User Data\'
+            - '\Login Data'
+    selection_chrome_cookies:
+        CommandLine|contains|all:
+            - '\Google\Chrome\User Data\'
+            - '\Network\Cookies'
+    selection_edge_login:
+        CommandLine|contains|all:
+            - '\Microsoft\Edge\User Data\'
+            - '\Login Data'
+    selection_edge_cookies:
+        CommandLine|contains|all:
+            - '\Microsoft\Edge\User Data\'
+            - '\Network\Cookies'
+    selection_firefox:
+        CommandLine|contains:
+            - '\Mozilla\Firefox\Profiles\'
+    selection_files:
+        CommandLine|contains:
+            - 'logins.json'
+            - 'key4.db'
+            - 'key3.db'
+    filter_installer:
+        ParentImage|endswith:
+            - '\msiexec.exe'
+            - '\setup.exe'
+    condition: (selection_tools_image or selection_tools_original) and (selection_chrome_login or selection_chrome_cookies or selection_edge_login or selection_edge_cookies or selection_firefox or selection_files) and not filter_installer
+fields:
+    - Image
+    - OriginalFileName
+    - CommandLine
+    - ParentImage
+    - ParentCommandLine
+    - CurrentDirectory
+    - User
+    - LogonId
+falsepositives:
+    - Legitimate browser profile migrations or backup scripts by administrators.
+    - Endpoint management tools performing user state migrations.
+level: high
+tags:
+    - attack.credential-access
+    - attack.t1555.003
+    - analytic.an0105
+    - detection.det0037
+---
+
+title: Suspicious SAM Registry Hive Export via CLI (AN0235-A)
+id: 8fd3af7d-481b-4c18-bc40-90cd4ec03491
+status: experimental
+description: Detects attempts to export the SAM, SYSTEM, or SECURITY registry hives using the reg.exe command line utility, indicating potential credential dumping.
+author: Krishna Gupta
+date: 2026-06-12
+logsource:
+    category: process_creation
+    product: windows
+detection:
+    selection_img:
+        - Image|endswith: '\reg.exe'
+        - OriginalFileName: 'reg.exe'
+    selection_action:
+        CommandLine|contains:
+            - 'save'
+            - 'export'
+            - 'backup'
+    selection_target:
+        CommandLine|contains:
+            - 'HKLM\SAM'
+            - 'HKLM\SYSTEM'
+            - 'HKLM\SECURITY'
+            - 'HKEY_LOCAL_MACHINE\SAM'
+            - 'HKEY_LOCAL_MACHINE\SYSTEM'
+            - 'HKEY_LOCAL_MACHINE\SECURITY'
+    filter_installer:
+        ParentImage|endswith:
+            - '\msiexec.exe'
+            - '\setup.exe'
+    condition: selection_img and selection_action and selection_target and not filter_installer
+fields:
+    - Image
+    - OriginalFileName
+    - CommandLine
+    - ParentImage
+    - ParentCommandLine
+    - CurrentDirectory
+    - User
+    - LogonId
+falsepositives:
+    - Legitimate system backup operations or imaging tools.
+    - Rare administrative troubleshooting by IT personnel.
+level: high
+tags:
+    - attack.credential-access
+    - attack.t1003.002
+    - analytic.an0235
+    - detection.det0085
+---
+
+title: Suspicious LSA Authentication Package Modification via Registry Set (AN0287-A)
+id: 11a71609-0f54-439c-892e-1c1b63c36ec3
+status: experimental
+description: Detects modifications to the LSA Authentication, Notification, or Security Packages registry keys, indicating the potential installation of a malicious password filter DLL or authentication bypass.
+author: Krishna Gupta
+date: 2026-06-12
+logsource:
+    category: registry_set
+    product: windows
+detection:
+    selection_target:
+        TargetObject|contains:
+            - '\CurrentControlSet\Control\Lsa\Authentication Packages'
+            - '\CurrentControlSet\Control\Lsa\Notification Packages'
+            - '\CurrentControlSet\Control\Lsa\Security Packages'
+            - '\CurrentControlSet\Control\Lsa\OSConfig\Security Packages'
+    filter_system:
+        Image|endswith:
+            - '\lsass.exe'
+            - '\services.exe'
+    condition: selection_target and not filter_system
+fields:
+    - TargetObject
+    - Image
+    - Details
+    - User
+falsepositives:
+    - Legitimate installation of enterprise identity and access management (IAM) software.
+    - Deployment of organizational password synchronization utilities.
+level: critical
+tags:
+    - attack.credential-access
+    - attack.defense-evasion
+    - attack.persistence
+    - attack.t1556
+    - attack.t1556.002
+    - analytic.an0287
+    - detection.det0104
+---
+
+title: Local Password Cracking Activity via CLI (AN0292-A)
+id: 6fc3b36d-2cbe-45b3-804b-8516350ed90e
+status: experimental
+description: Detects the execution of known password cracking utilities (like Hashcat or John the Ripper) or their associated command-line arguments on a local endpoint, indicating local brute-force password cracking.
+author: Krishna Gupta
+date: 2026-06-12
+logsource:
+    category: process_creation
+    product: windows
+detection:
+    selection_tools:
+        - Image|endswith:
+            - '\hashcat.exe'
+            - '\john.exe'
+        - OriginalFileName:
+            - 'hashcat.exe'
+            - 'john.exe'
+    selection_hashcat_args:
+        CommandLine|contains:
+            - ' -a '
+            - ' --attack-mode '
+            - ' -a='
+            - ' --attack-mode='
+    selection_hashcat_type:
+        CommandLine|contains:
+            - ' -m '
+            - ' --hash-type '
+            - ' -m='
+            - ' --hash-type='
+    selection_cmdline_john:
+        CommandLine|contains:
+            - '--wordlist='
+            - '--format='
+            - '--rules'
+            - '--single'
+            - '--incremental'
+            - '--show'
+    filter_installer:
+        ParentImage|endswith:
+            - '\msiexec.exe'
+            - '\setup.exe'
+    condition: (selection_tools or (selection_hashcat_args and selection_hashcat_type) or selection_cmdline_john) and not filter_installer
+fields:
+    - Image
+    - OriginalFileName
+    - CommandLine
+    - ParentImage
+    - ParentCommandLine
+    - CurrentDirectory
+    - User
+    - LogonId
+falsepositives:
+    - Authorized penetration testing or red team engagements.
+    - Password auditing conducted by the internal security team.
+level: high
+tags:
+    - attack.credential-access
+    - attack.t1110.002
+    - analytic.an0292
+    - detection.det0105
+---
+
+title: AS-REP Roasting Tool Execution via CLI (AN0316-A)
+id: 67eb3ac3-7dc7-493e-9978-ff0514b33c08
+status: experimental
+description: Detects command-line parameters associated with AS-REP Roasting attacks, targeting accounts with Kerberos pre-authentication disabled to extract crackable hashes.
+author: Krishna Gupta
+date: 2026-06-12
+logsource:
+    category: process_creation
+    product: windows
+detection:
+    selection_rubeus_cmd:
+        CommandLine|contains:
+            - 'asreproast'
+    selection_powerview:
+        CommandLine|contains:
+            - 'PreauthNotRequired'
+    selection_impacket:
+        CommandLine|contains:
+            - 'GetNPUsers'
+    selection_shells_image:
+        Image|endswith:
+            - '\powershell.exe'
+            - '\pwsh.exe'
+            - '\cmd.exe'
+    selection_shells_original:
+        OriginalFileName:
+            - 'PowerShell.EXE'
+            - 'pwsh.dll'
+            - 'Cmd.Exe'
+    filter_installer:
+        ParentImage|endswith:
+            - '\msiexec.exe'
+            - '\setup.exe'
+    condition: (selection_rubeus_cmd or ( (selection_shells_image or selection_shells_original) and (selection_powerview or selection_impacket) )) and not filter_installer
+fields:
+    - Image
+    - OriginalFileName
+    - CommandLine
+    - ParentImage
+    - ParentCommandLine
+    - CurrentDirectory
+    - User
+    - LogonId
+falsepositives:
+    - Internal security teams conducting routine Active Directory misconfiguration audits.
+    - Automated IAM tools querying for vulnerable account flags.
+level: high
+tags:
+    - attack.credential-access
+    - attack.t1558.004
+    - analytic.an0316
+    - detection.det0113
+---
+
+title: Suspicious Windows Credential Manager Access via CLI (AN0378-A)
+id: edcbb2f2-05d6-4886-8f7b-5c874cc77ea2
+status: experimental
+description: Detects command-line operations attempting to enumerate or extract stored credentials from the Windows Credential Manager (Vault) using native utilities, indicating potential credential theft.
+author: Krishna Gupta
+date: 2026-06-12
+logsource:
+    category: process_creation
+    product: windows
+detection:
+    selection_tools:
+        - Image|endswith: 
+            - '\cmdkey.exe'
+            - '\vaultcmd.exe'
+        - OriginalFileName: 
+            - 'cmdkey.exe'
+            - 'vaultcmd.exe'
+    selection_args:
+        CommandLine|contains:
+            - '/list'
+            - '/l'
+            - '-l'
+            - '-list'
+            - '/listcreds'
+            - '/listproperties'
+    filter_installer:
+        ParentImage|endswith:
+            - '\msiexec.exe'
+            - '\setup.exe'
+    condition: (selection_tools_image or selection_tools_original) and selection_args and not filter_installer
+fields:
+    - Image
+    - OriginalFileName
+    - CommandLine
+    - ParentImage
+    - ParentCommandLine
+    - CurrentDirectory
+    - User
+    - LogonId
+falsepositives:
+    - IT administrators troubleshooting network drive mappings or RDP access.
+    - Automated deployment scripts configuring persistent network share access.
+level: high
+tags:
+    - attack.credential-access
+    - attack.t1555.004
+    - analytic.an0378
+    - detection.det0134
+---
+
+title: Golden Ticket Forging Tool Execution via CLI (AN0405-A)
+id: e26a057f-ad7f-4d5e-86f4-ab74fdffae14
+status: experimental
+description: Detects command-line parameters and process executions associated with the forging or injection of Kerberos Golden Tickets using tools like Mimikatz or Rubeus.
+author: Krishna Gupta
+date: 2026-06-12
+logsource:
+    category: process_creation
+    product: windows
+detection:
+    selection_mimikatz:
+        CommandLine|contains: 'kerberos::golden'
+    selection_rubeus:
+        CommandLine|contains|all:
+            - 'golden'
+            - '/krbtgt:'
+    selection_rubeus_ptt:
+        CommandLine|contains|all:
+            - 'golden'
+            - '/ptt'
+    selection_tools_image:
+        Image|endswith:
+            - '\mimikatz.exe'
+            - '\rubeus.exe'
+    selection_tools_original:
+        OriginalFileName:
+            - 'mimikatz.exe'
+            - 'Rubeus.exe'
+    filter_installer:
+        ParentImage|endswith:
+            - '\msiexec.exe'
+            - '\setup.exe'
+    condition: (selection_mimikatz or selection_rubeus or selection_rubeus_ptt or selection_tools_image or selection_tools_original) and not filter_installer
+fields:
+    - Image
+    - OriginalFileName
+    - CommandLine
+    - ParentImage
+    - ParentCommandLine
+    - CurrentDirectory
+    - User
+    - LogonId
+falsepositives:
+    - Authorized red team engagements or adversary emulation exercises.
+level: critical
+tags:
+    - attack.credential-access
+    - attack.t1558.001
+    - analytic.an0405
+    - detection.det0144
+---
+
+title: Credential String Search in Files and Registry (AN2103)
+id: 7b77b164-6603-430f-80e7-0e12041a164b
+status: experimental
+description: Detects findstr.exe or reg.exe being used to search for plaintext password strings in files or registry, indicating unsecured credential harvesting. Includes OriginalFileName to resist binary-rename evasion.
+author: Krishna Gupta
+date: 2026-07-01
+logsource:
+    category: process_creation
+    product: windows
+detection:
+    selection_findstr:
+        Image|endswith:
+            - '\findstr.exe'
+    selection_findstr_ofn:
+        OriginalFileName: 'FINDSTR.EXE'
+    selection_findstr_cli:
+        CommandLine|re:
+            - '(?i)\b(password|passwd|credentials|connectionstring)\b'
+    selection_reg:
+        Image|endswith:
+            - '\reg.exe'
+    selection_reg_ofn:
+        OriginalFileName: 'reg.exe'
+    selection_reg_cli:
+        CommandLine|contains:
+            - 'password'
+            - 'passwd'
+            - 'DefaultPassword'
+            - 'AutoAdminLogon'
+    filter_av_scan:
+        ParentImage|endswith:
+            - '\MsMpEng.exe'
+            - '\SenseCnfg.exe'
+    condition: (((selection_findstr or selection_findstr_ofn) and selection_findstr_cli) or ((selection_reg or selection_reg_ofn) and selection_reg_cli)) and not filter_av_scan
+fields:
+    - Image
+    - OriginalFileName
+    - CommandLine
+    - User
+falsepositives:
+    - Security scanners or vulnerability assessment tools searching for plaintext credential exposure.
+level: high
+tags:
+    - attack.credential_access
+    - attack.t1552
+    - analytic.an2103
+    - detection.det0960
+---
+
+title: Forced Authentication via UNC Path or SCF File Creation (AN2104)
+id: 6260d4f8-fd56-4544-afda-34d85a835024
+status: experimental
+description: Detects creation of .scf files with UNC icon paths or net use commands targeting non-standard shares, used to force NTLM authentication to attacker-controlled servers. Includes OriginalFileName to resist binary-rename evasion.
+author: Krishna Gupta
+date: 2026-07-01
+logsource:
+    category: process_creation
+    product: windows
+detection:
+    selection_net:
+        Image|endswith:
+            - '\net.exe'
+            - '\net1.exe'
+    selection_net_ofn:
+        OriginalFileName:
+            - 'net.exe'
+            - 'net1.exe'
+    selection_net_cli:
+        CommandLine|re:
+            - '(?i)net(1)?\s+use\s+\\\\\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}'
+    selection_ps_unc:
+        Image|endswith:
+            - '\powershell.exe'
+            - '\pwsh.exe'
+    selection_ps_unc_ofn:
+        OriginalFileName:
+            - 'PowerShell.EXE'
+            - 'pwsh.exe'
+    selection_ps_unc_cli:
+        CommandLine|re:
+            - '(?i)New-PSDrive.+\\\\\d{1,3}\.\d{1,3}'
+    filter_internal:
+        CommandLine|contains:
+            - '\\10.'
+            - '\\192.168.'
+            - '\\172.16.'
+            - '\\172.17.'
+            - '\\172.18.'
+            - '\\172.19.'
+            - '\\172.20.'
+            - '\\172.21.'
+            - '\\172.22.'
+            - '\\172.23.'
+            - '\\172.24.'
+            - '\\172.25.'
+            - '\\172.26.'
+            - '\\172.27.'
+            - '\\172.28.'
+            - '\\172.29.'
+            - '\\172.30.'
+            - '\\172.31.'
+    condition: (((selection_net or selection_net_ofn) and selection_net_cli) or ((selection_ps_unc or selection_ps_unc_ofn) and selection_ps_unc_cli)) and not filter_internal
+fields:
+    - Image
+    - OriginalFileName
+    - CommandLine
+    - User
+falsepositives:
+    - Administrators using net use to map drives to internal file servers by IP address.
+level: high
+tags:
+    - attack.credential_access
+    - attack.t1187
+    - analytic.an2104
+    - detection.det0961
+---
+
+title: Browser Cookie Database Access by Non-Browser Process (AN2107)
+id: 4475f0f2-de51-4b25-b9ff-ec74a5b4f85c
+status: experimental
+description: Detects processes other than browsers reading SQLite cookie databases from Chrome, Edge, or Firefox profile directories. Used by attackers to steal authenticated session tokens without re-authenticating.
+author: Krishna Gupta
+date: 2026-07-01
+logsource:
+    category: process_creation
+    product: windows
+detection:
+    selection_sqlite_tools:
+        Image|endswith:
+            - '\sqlite3.exe'
+            - '\python.exe'
+            - '\python3.exe'
+    selection_cookie_paths:
+        CommandLine|contains:
+            - 'AppData\Local\Google\Chrome\User Data'
+            - 'AppData\Local\Microsoft\Edge\User Data'
+            - 'AppData\Roaming\Mozilla\Firefox\Profiles'
+            - '\Cookies'
+            - '\Network\Cookies'
+    selection_ps_cookie:
+        Image|endswith:
+            - '\powershell.exe'
+            - '\pwsh.exe'
+    selection_ps_cookie_ofn:
+        OriginalFileName:
+            - 'PowerShell.EXE'
+            - 'pwsh.exe'
+    selection_ps_cookie_cli:
+        CommandLine|contains:
+            - 'Chrome\User Data'
+            - 'Edge\User Data'
+            - 'Firefox\Profiles'
+            - 'Cookies'
+    condition: (selection_sqlite_tools and selection_cookie_paths) or ((selection_ps_cookie or selection_ps_cookie_ofn) and selection_ps_cookie_cli)
+fields:
+    - Image
+    - CommandLine
+    - User
+falsepositives:
+    - Cookie management or synchronization tools operating on browser data for backup purposes.
+level: high
+tags:
+    - attack.credential_access
+    - attack.t1539
+    - analytic.an2107
+    - detection.det0964
+---
+
+title: Custom Security Support Provider or LSA Package Registration (AN2115)
+id: c61ed72a-7543-474c-9bfb-97727f27c092
+status: experimental
+description: "Detects modifications to registry values under HKLM\\SYSTEM\\CurrentControlSet\\Control\\Lsa (Security Packages, Authentication Packages) or SecurityProviders, which can be abused by adversaries to register custom Security Support Providers (SSPs) to intercept plaintext passwords and MFA credentials."
+author: Krishna Gupta
+date: 2026-07-01
+logsource:
+    category: registry_set
+    product: windows
+detection:
+    selection_registry_paths:
+        TargetObject|contains:
+            - '\System\CurrentControlSet\Control\Lsa\Security Packages'
+            - '\System\CurrentControlSet\Control\Lsa\Authentication Packages'
+            - '\System\CurrentControlSet\Control\SecurityProviders\SecurityProviders'
+    filter_installer:
+        ParentImage|endswith:
+            - '\msiexec.exe'
+            - '\setup.exe'
+    condition: selection_registry_paths and not filter_installer
+fields:
+    - TargetObject
+    - Details
+    - Image
+    - User
+falsepositives:
+    - Standard enterprise software (like backup tools or custom endpoint security agents) registering their own security support packages during system installation.
+level: high
+tags:
+    - attack.credential-access
+    - attack.t1111
+    - analytic.an2115
+    - detection.det0972
+---
+
+title: Print Spooler Service Spawning Suspicious Child Process (AN2118)
+id: 5c7044f6-6b63-4a09-aa07-483b456afe8f
+status: experimental
+description: "Detects command shells, interpreters, or system administrative utilities spawned as child processes of spoolsv.exe (Windows Print Spooler), which is a common indicator of successful exploitation of Print Spooler vulnerabilities (such as PrintNightmare CVE-2021-34527) to perform local execution or credential harvesting."
+author: Krishna Gupta
+date: 2026-07-01
+logsource:
+    category: process_creation
+    product: windows
+detection:
+    selection_parent:
+        ParentImage|endswith:
+            - '\spoolsv.exe'
+    selection_parent_ofn:
+        ParentOriginalFileName: 'spoolsv.exe'
+    selection_child_images:
+        Image|endswith:
+            - '\cmd.exe'
+            - '\powershell.exe'
+            - '\pwsh.exe'
+            - '\wscript.exe'
+            - '\cscript.exe'
+            - '\rundll32.exe'
+            - '\regsvr32.exe'
+            - '\whoami.exe'
+            - '\nltest.exe'
+    selection_child_ofn:
+        OriginalFileName:
+            - 'Cmd.Exe'
+            - 'PowerShell.EXE'
+            - 'pwsh.exe'
+            - 'wscript.exe'
+            - 'cscript.exe'
+            - 'rundll32.exe'
+            - 'regsvr32.exe'
+            - 'whoami.exe'
+            - 'nltest.exe'
+    condition: (selection_parent or selection_parent_ofn) and (selection_child_images or selection_child_ofn)
+fields:
+    - ParentImage
+    - Image
+    - CommandLine
+    - User
+falsepositives:
+    - Legitimate printer installation scripts that invoke command line utilities to configure ports or load driver details during printer configuration.
+level: critical
+tags:
+    - attack.credential-access
+    - attack.t1212
+    - analytic.an2118
+    - detection.det0975
+---
+
+title: Authentication Certificate or Private Key Export Tool Execution (AN2123)
+id: 5d17fc7f-9fab-4838-ab02-0115ca5f13f5
+status: experimental
+description: "Detects the execution of known AD CS enumeration tools (e.g. Certify) or command-line parameters attempting to export authentication certificates and private keys (such as certutil.exe -exportPFX or similar commands) to steal credentials."
+author: Krishna Gupta
+date: 2026-07-01
+logsource:
+    category: process_creation
+    product: windows
+detection:
+    selection_certify:
+        Image|endswith: '\certify.exe'
+    selection_certify_ofn:
+        OriginalFileName: 'Certify.exe'
+    selection_export_images:
+        Image|endswith:
+            - '\certutil.exe'
+            - '\powershell.exe'
+            - '\pwsh.exe'
+    selection_export_ofn:
+        OriginalFileName:
+            - 'certutil.exe'
+            - 'PowerShell.EXE'
+            - 'pwsh.exe'
+    selection_export_cli:
+        CommandLine|contains:
+            - '-exportPFX'
+            - '-exportpfx'
+            - 'Export-PfxCertificate'
+    filter_installer:
+        ParentImage|endswith:
+            - '\msiexec.exe'
+            - '\setup.exe'
+    condition: (selection_certify or selection_certify_ofn or ((selection_export_images or selection_export_ofn) and selection_export_cli)) and not filter_installer
+fields:
+    - Image
+    - OriginalFileName
+    - CommandLine
+    - User
+falsepositives:
+    - Administrators legitimately backing up server certificates or exporting public keys for deployment.
+level: high
+tags:
+    - attack.credential-access
+    - attack.t1649
+    - analytic.an2123
+    - detection.det0980
+---
+
+title: Social Engineering Script-Based Credential Dialog Prompt (AN2128)
+id: ff5de6eb-b36e-421f-978e-eac24b777e55
+status: experimental
+description: "Detects process command line arguments indicating the spawning of credential dialog boxes or login forms (such as PowerShell Get-Credential or MSHTA HTML forms) used in post-exploitation to trick users into typing administrative passwords."
+author: Krishna Gupta
+date: 2026-07-01
+logsource:
+    category: process_creation
+    product: windows
+detection:
+    selection_images:
+        Image|endswith:
+            - '\powershell.exe'
+            - '\pwsh.exe'
+            - '\mshta.exe'
+            - '\wscript.exe'
+            - '\cscript.exe'
+    selection_ofn:
+        OriginalFileName:
+            - 'PowerShell.EXE'
+            - 'pwsh.exe'
+            - 'mshta.exe'
+            - 'wscript.exe'
+            - 'cscript.exe'
+    selection_cli:
+        CommandLine|contains:
+            - 'Get-Credential'
+            - 'PromptForCredential'
+    filter_installer:
+        ParentImage|endswith:
+            - '\msiexec.exe'
+            - '\setup.exe'
+    filter_admin_context:
+        ParentImage|endswith:
+            - '\powershell_ise.exe'
+            - '\vscode\Code.exe'
+            - '\mmc.exe'
+    condition: (selection_images or selection_ofn) and selection_cli and not (filter_installer or filter_admin_context)
+fields:
+    - Image
+    - OriginalFileName
+    - CommandLine
+    - User
+falsepositives:
+    - Legitimate administrative scripts that prompt the user to input credentials for running remote server tasks.
+level: high
+tags:
+    - attack.credential-access
+    - attack.t1684
+    - analytic.an2128
+    - detection.det0985
+---
+
+title: Installation of Root Certificate via CLI (AN0153)
+id: 05a3dd1f-209b-472d-bbbc-1c62ddf5357c
+status: experimental
+description: Detects command-line execution of certutil.exe, certmgr.exe, or PowerShell cmdlets adding a certificate to the local Trusted Root Certification Authorities store.
+author: Krishna Gupta
+date: 2026-06-07
+logsource:
+    category: process_creation
+    product: windows
+    # Relies on Sysmon Event ID 1
+detection:
+    selection_certutil:
+        - Image|endswith: '\certutil.exe'
+        - OriginalFileName: 'CertUtil.exe'
+    selection_certutil_args:
+        CommandLine|contains|all:
+            - '-addstore'
+            - 'root'
+    selection_certmgr:
+        - Image|endswith: '\certmgr.exe'
+        - OriginalFileName: 'certmgr.exe'
+    selection_certmgr_args:
+        CommandLine|contains|all:
+            - '/add'
+            - 'root'
+    selection_powershell:
+        - Image|endswith:
+            - '\powershell.exe'
+            - '\pwsh.exe'
+        - OriginalFileName:
+            - 'PowerShell.EXE'
+            - 'pwsh.dll'
+    selection_powershell_cmdlets:
+        CommandLine|contains|all:
+            - 'Import-Certificate'
+            - 'Root'
+    condition: (selection_certutil and selection_certutil_args) or (selection_certmgr and selection_certmgr_args) or (selection_powershell and selection_powershell_cmdlets)
+fields:
+    - Image
+    - OriginalFileName
+    - CommandLine
+    - ParentImage
+    - ParentCommandLine
+    - CurrentDirectory
+    - User
+    - LogonId
+falsepositives:
+    - Internal IT administrator scripts deployed to distribute enterprise PKI root certificates.
+    - Security agent or VPN installations that require installing custom root certificates.
+level: high
+tags:
+    - attack.defense-evasion
+    - attack.t1553.004
+    - analytic.an0153
+    - detection.det0056
+---
+
+title: Force Safe Mode Boot or Tamper SafeBoot Configuration (AN0323)
+id: b582bc86-ac15-4b3f-a692-f19ffc544a18
+status: experimental
+description: Detects command-line execution of bcdedit.exe used to force the system into Safe Mode boot, or reg.exe modifying SafeBoot configuration keys to inject persistent drivers/services.
+author: Krishna Gupta
+date: 2026-06-07
+logsource:
+    category: process_creation
+    product: windows
+    # Relies on Sysmon Event ID 1
+detection:
+    selection_bcdedit:
+        - Image|endswith: '\bcdedit.exe'
+        - OriginalFileName: 'bcdedit.exe'
+    selection_bcdedit_args:
+        CommandLine|contains|all:
+            - 'safeboot'
+    selection_reg:
+        - Image|endswith: '\reg.exe'
+        - OriginalFileName: 'reg.exe'
+    selection_reg_args:
+        CommandLine|contains:
+            - 'add'
+        CommandLine|contains:
+            - '\Control\SafeBoot\Minimal'
+            - '\Control\SafeBoot\Network'
+    condition: (selection_bcdedit and selection_bcdedit_args) or (selection_reg and selection_reg_args)
+fields:
+    - Image
+    - OriginalFileName
+    - CommandLine
+    - ParentImage
+    - ParentCommandLine
+    - CurrentDirectory
+    - User
+    - LogonId
+falsepositives:
+    - Legitimate administrator troubleshooting or IT deployment tasks configuring system boot options.
+level: high
+tags:
+    - attack.defense-evasion
+    - attack.t1688
+    - analytic.an0323
+    - detection.det0116
+---
+
+title: Disabling or Tampering with Windows Firewall (AN0406)
+id: 49d0eb3c-d88c-4534-954f-128c93f224fe
+status: experimental
+description: Detects command-line operations that attempt to disable, modify, or stop the Windows Defender Firewall service or profiles using netsh.exe, PowerShell, or service control utilities.
+author: Krishna Gupta
+date: 2026-06-07
+logsource:
+    category: process_creation
+    product: windows
+    # Relies on Sysmon Event ID 1
+detection:
+    selection_netsh:
+        - Image|endswith: '\netsh.exe'
+        - OriginalFileName: 'netsh.exe'
+    selection_netsh_args:
+        CommandLine|contains|all:
+            - 'advfirewall'
+            - 'set'
+            - 'state'
+            - 'off'
+    selection_powershell:
+        - Image|endswith:
+            - '\powershell.exe'
+            - '\pwsh.exe'
+        - OriginalFileName:
+            - 'PowerShell.EXE'
+            - 'pwsh.dll'
+    selection_powershell_cmdlets:
+        CommandLine|contains:
+            - 'Set-NetFirewallProfile'
+            - 'Disable-NetFirewallRule'
+            - 'Remove-NetFirewallRule'
+    selection_powershell_args:
+        CommandLine|contains:
+            - 'False'
+            - 'off'
+    selection_service_control:
+        - Image|endswith:
+            - '\sc.exe'
+            - '\net.exe'
+        - OriginalFileName:
+            - 'sc.exe'
+            - 'net.exe'
+    selection_service_args:
+        CommandLine|contains|all:
+            - 'mpssvc'
+        CommandLine|contains:
+            - 'stop'
+            - 'disable'
+    condition: (selection_netsh and selection_netsh_args) or (selection_powershell and selection_powershell_cmdlets and selection_powershell_args) or (selection_service_control and selection_service_args)
+fields:
+    - Image
+    - OriginalFileName
+    - CommandLine
+    - ParentImage
+    - ParentCommandLine
+    - CurrentDirectory
+    - User
+    - LogonId
+falsepositives:
+    - Legitimate administrative troubleshooting or network configuration scripts that temporarily disable profiles or remove rules.
+level: high
+tags:
+    - attack.defense-evasion
+    - attack.t1686
+    - analytic.an0406
+    - detection.det0145
+---
+
+title: Disabling or Tampering with Windows Event Logging (AN0535)
+id: 7c0545c2-fdde-4f34-969c-a39652ce1d40
+status: experimental
+description: Detects command-line operations that attempt to disable, clear, or modify Windows Event Log services, logging channels, or system audit policies.
+author: Krishna Gupta
+date: 2026-06-07
+logsource:
+    category: process_creation
+    product: windows
+    # Relies on Sysmon Event ID 1
+detection:
+    selection_wevtutil:
+        - Image|endswith: '\wevtutil.exe'
+        - OriginalFileName: 'wevtutil.exe'
+    selection_wevtutil_args:
+        CommandLine|contains:
+            - ' cl '      # Clear log
+            - ' clear-log '
+            - '/e:false'  # Disable log
+            - '/enabled:false'
+    selection_auditpol:
+        - Image|endswith: '\auditpol.exe'
+        - OriginalFileName: 'Auditpol.exe'
+    selection_auditpol_args:
+        CommandLine|contains:
+            - '/clear'
+            - '/remove'
+            - '/success:disable'
+            - '/failure:disable'
+    selection_service_control:
+        - Image|endswith:
+            - '\sc.exe'
+            - '\net.exe'
+            - '\powershell.exe'
+            - '\pwsh.exe'
+        - OriginalFileName:
+            - 'sc.exe'
+            - 'net.exe'
+            - 'PowerShell.EXE'
+            - 'pwsh.dll'
+    selection_service_args:
+        CommandLine|contains|all:
+            - 'eventlog'
+        CommandLine|contains:
+            - 'stop'
+            - 'disable'
+    condition: (selection_wevtutil and selection_wevtutil_args) or (selection_auditpol and selection_auditpol_args) or (selection_service_control and selection_service_args)
+fields:
+    - Image
+    - OriginalFileName
+    - CommandLine
+    - ParentImage
+    - ParentCommandLine
+    - CurrentDirectory
+    - User
+    - LogonId
+falsepositives:
+    - Legitimate administrative maintenance, diagnostic troubleshooting, or script-based log rotation configured by enterprise engineers.
+level: high
+tags:
+    - attack.defense-evasion
+    - attack.t1685.001
+    - analytic.an0535
+    - detection.det0187
+---
+
+title: MFA Registry Configuration Tampering (AN0543-A)
+id: de1ae312-2cb4-4d6a-ac0f-56870094c7de
+status: experimental
+description: Detects registry modifications attempting to disable Windows Hello PIN or credential providers that enforce MFA.
+author: Krishna Gupta
+date: 2026-06-30
+logsource:
+    category: registry_set
+    product: windows
+detection:
+    selection_hello:
+        TargetObject|contains:
+            - '\Microsoft\Windows\System\PINLogin'
+            - '\Microsoft\Windows\System\AllowDomainPINLogon'
+        Details: 'DWORD (0x00000000)'
+    selection_cred_providers:
+        TargetObject|contains:
+            - '\Microsoft\Windows\CurrentVersion\Authentication\Credential Providers\'
+        TargetObject|endswith:
+            - '\Disabled'
+        Details: 'DWORD (0x00000001)'
+    condition: selection_hello or selection_cred_providers
+fields:
+    - TargetObject
+    - Details
+    - User
+falsepositives:
+    - Administrative provisioning or decommissioning of Windows Hello Hello for Business.
+level: medium
+tags:
+    - attack.defense-impairment
+    - attack.t1556.006
+    - analytic.an0543
+    - detection.det0190
+---
+
+title: Detect Suspicious or Malicious Code Signing Abuse (AN0643)
+id: 46656e2b-74b3-46c3-a7a2-14173bac8091
+status: experimental
+description: Detects registry modifications under system certificate store paths that register disallowed or untrusted code signing certificates.
+author: Krishna Gupta
+date: 2026-06-17
+logsource:
+    category: registry_set
+    product: windows
+detection:
+    selection:
+        TargetObject|contains:
+            - '\SOFTWARE\Microsoft\SystemCertificates\Disallowed\Certificates\'
+            - '\SOFTWARE\Microsoft\SystemCertificates\Untrusted\'
+    condition: selection
+fields:
+    - TargetObject
+    - Details
+    - Image
+    - User
+falsepositives:
+    - Legitimate administrative certificate revocation distributions.
+level: high
+tags:
+    - attack.defense-evasion
+    - attack.t1553.002
+    - analytic.an0643
+    - detection.det0230
+---
+
+title: Subvert Trust Controls - Mark-of-the-Web Bypass via Container Mount (AN0712)
+id: fa8e591d-6a41-4716-acd4-d146228b017a
+status: experimental
+description: Detects processes executing from drive paths that are typically created when mounting container or disk image files (like .iso, .vhd), suggesting an attempt to bypass Mark-of-the-Web (MOTW).
+author: Krishna Gupta
+date: 2026-06-08
+logsource:
+    category: process_creation
+    product: windows
+    # Relies on Sysmon Event ID 1
+detection:
+    selection_drive:
+ # Mounted container files often allocate drive letters starting from D: to Z:
+ # and execute script engines or executable payloads.
+        CommandLine|contains:
+            - 'D:\'
+            - 'E:\'
+            - 'F:\'
+            - 'G:\'
+            - 'H:\'
+    selection_payloads:
+        - Image|endswith:
+            - '\cmd.exe'
+            - '\powershell.exe'
+            - '\pwsh.exe'
+            - '\wscript.exe'
+            - '\cscript.exe'
+            - '\rundll32.exe'
+            - '\regsvr32.exe'
+            - '\mshta.exe'
+        - OriginalFileName:
+            - 'cmd.exe'
+            - 'PowerShell.EXE'
+            - 'pwsh.dll'
+            - 'wscript.exe'
+            - 'cscript.exe'
+            - 'rundll32.exe'
+            - 'regsvr32.exe'
+            - 'mshta.exe'
+    condition: selection_drive and selection_payloads
+fields:
+    - Image
+    - OriginalFileName
+    - CommandLine
+    - ParentImage
+    - ParentCommandLine
+    - CurrentDirectory
+    - User
+    - LogonId
+falsepositives:
+    - User installing legitimate software from a mounted physical/virtual CD/DVD.
+    - IT administrators deploying software from network-attached ISO images.
+level: medium
+tags:
+    - attack.defense-evasion
+    - attack.t1553.005
+    - analytic.an0712
+    - detection.det0257
+---
+
+title: Command-Line Domain Trust or Policy Modification (AN0755)
+id: 77f23b26-f1e7-42cd-8438-8c3de56b785e
+status: experimental
+description: Detects command-line execution of netdom.exe, nltest.exe, or PowerShell Active Directory cmdlets used to modify domain trust relationships, register rogue domain controllers, or alter domain policy.
+author: Krishna Gupta
+date: 2026-06-07
+logsource:
+    category: process_creation
+    product: windows
+    # Relies on Sysmon Event ID 1
+detection:
+    selection_netdom:
+        - Image|endswith: '\netdom.exe'
+        - OriginalFileName: 'netdom.exe'
+    selection_netdom_args:
+        CommandLine|contains:
+            - 'trust'
+            - 'member'
+    selection_nltest:
+        - Image|endswith: '\nltest.exe'
+        - OriginalFileName: 'nltest.exe'
+    selection_nltest_args:
+        CommandLine|contains:
+            - '/trust_commit'
+            - '/dsreg'
+            - '/domain_trusts'
+    selection_powershell:
+        - Image|endswith:
+            - '\powershell.exe'
+            - '\pwsh.exe'
+        - OriginalFileName:
+            - 'PowerShell.EXE'
+            - 'pwsh.dll'
+    selection_powershell_cmdlets:
+        CommandLine|contains:
+            - 'Add-ADDomainTrust'
+            - 'Remove-ADDomainTrust'
+            - 'Set-ADDomainTrust'
+    condition: (selection_netdom and selection_netdom_args) or (selection_nltest and selection_nltest_args) or (selection_powershell and selection_powershell_cmdlets)
+fields:
+    - Image
+    - OriginalFileName
+    - CommandLine
+    - ParentImage
+    - ParentCommandLine
+    - CurrentDirectory
+    - User
+    - LogonId
+falsepositives:
+    - Authorized active directory migration activities or configuration of cross-forest trusts by enterprise domain administrators.
+level: high
+tags:
+    - attack.defense-evasion
+    - attack.privilege-escalation
+    - attack.t1484
+    - analytic.an0755
+    - detection.det0270
+---
+
+title: Hybrid Identity Service Registry Tampering (AN0814-A)
+id: 187a7f9e-c376-459b-be92-eadd1384ad5d
+status: experimental
+description: Detects registry modifications targeting Azure AD Connect or AD FS service configurations.
+author: Krishna Gupta
+date: 2026-06-30
+logsource:
+    category: registry_set
+    product: windows
+detection:
+    selection_registry:
+        TargetObject|contains:
+            - 'SOFTWARE\Microsoft\Microsoft Azure AD Connection Tool\'
+            - 'SOFTWARE\Microsoft\ADFS\'
+            - 'SYSTEM\CurrentControlSet\Services\AdFederationSvc\'
+    filter_legitimate:
+        Image|endswith:
+            - '\AzureADConnect.exe'
+            - '\miiserver.exe'
+    condition: selection_registry and not filter_legitimate
+fields:
+    - TargetObject
+    - Details
+    - User
+falsepositives:
+    - Standard administrator updates or reconfiguration of Azure AD Connect Sync Service.
+level: medium
+tags:
+    - attack.defense-impairment
+    - attack.t1556.007
+    - analytic.an0814
+    - detection.det0293
+---
+
+title: Suspicious File and Directory Permissions Modification (AN0834)
+id: 2486f522-c342-479f-ac9a-fc40f8a31bb8
+status: experimental
+description: Detects command-line permissions modifications using built-in Windows utilities (icacls, cacls, takeown, attrib) targeting directory ownership, granting excessive rights, denying access, or hiding files.
+author: Krishna Gupta
+date: 2026-06-07
+logsource:
+    category: process_creation
+    product: windows
+    # Relies on Sysmon Event ID 1
+detection:
+    selection_takeown:
+        - Image|endswith: '\takeown.exe'
+        - OriginalFileName: 'takeown.exe'
+    selection_takeown_cmd:
+        CommandLine|contains|all:
+            - ' /f '
+            - ' /r'
+    selection_icacls:
+        - Image|endswith:
+            - '\icacls.exe'
+            - '\cacls.exe'
+        - OriginalFileName:
+            - 'iCACLS.EXE'
+            - 'cacls.exe'
+    selection_icacls_cmd:
+        CommandLine|contains:
+            - 'Everyone:F'
+            - 'Everyone:FA'
+            - ' /deny '
+            - ' /reset'
+    selection_attrib:
+        - Image|endswith: '\attrib.exe'
+        - OriginalFileName: 'attrib.exe'
+    selection_attrib_cmd:
+        CommandLine|contains|all:
+            - ' +h'
+            - ' +s'
+    condition: (selection_takeown and selection_takeown_cmd) or (selection_icacls and selection_icacls_cmd) or (selection_attrib and selection_attrib_cmd)
+fields:
+    - Image
+    - OriginalFileName
+    - CommandLine
+    - ParentImage
+    - ParentCommandLine
+    - CurrentDirectory
+    - User
+    - LogonId
+falsepositives:
+    - Administrative scripts, software installation, or updates modifying permissions or attributes on legacy applications.
+    - System setup utilities configuring system files.
+level: high
+tags:
+    - attack.defense-evasion
+    - attack.privilege-escalation
+    - attack.t1222.001
+    - analytic.an0834
+    - detection.det0299
+---
+
+title: Disable or Modify Tools - Spoof Tool UI (AN0868)
+id: 13ae68bb-5ab8-4e33-bd2c-7b716e487510
+status: experimental
+description: Detects inconsistencies between reported sensor health and actual process/service state, suggesting UI spoofing.
+author: Krishna Gupta
+date: 2026-06-09
+logsource:
+    category: process_creation
+    product: windows
+    # Relies on Sysmon Event ID 1
+detection:
+    selection_ui:
+        Image|endswith:
+            - '\SecurityHealthSystray.exe'
+            - '\MSASCui.exe'
+    selection_cmd:
+        CommandLine|contains:
+            - 'spoof'
+            - 'hidden'
+            - 'disable'
+    condition: selection_ui and selection_cmd
+fields:
+    - Image
+    - OriginalFileName
+    - CommandLine
+    - ParentImage
+    - ParentCommandLine
+    - CurrentDirectory
+    - User
+    - LogonId
+falsepositives:
+    - Administrative troubleshooting of security tool UI components.
+level: medium
+tags:
+    - attack.defense-evasion
+    - attack.t1685.003
+    - analytic.an0868
+    - detection.det0311
+---
+
+title: Downgrade Attack - PowerShell v2 Execution (AN0995)
+id: 4f895cf3-72c3-4d33-9932-fa2aec64fbe9
+status: experimental
+description: Detects the execution of PowerShell explicitly requesting version 2 or legacy binaries, bypassing modern security logging.
+author: Krishna Gupta
+date: 2026-06-09
+logsource:
+    category: process_creation
+    product: windows
+    # Relies on Sysmon Event ID 1
+detection:
+    selection_ps:
+        Image|endswith:
+            - '\powershell.exe'
+            - '\pwsh.exe'
+    selection_args:
+        CommandLine|contains|all:
+            - '-version'
+            - '2'
+    condition: selection_ps and selection_args
+fields:
+    - Image
+    - OriginalFileName
+    - CommandLine
+    - ParentImage
+    - ParentCommandLine
+    - CurrentDirectory
+    - User
+    - LogonId
+falsepositives:
+    - Legacy enterprise scripts that explicitly require PowerShell v2 for compatibility.
+level: high
+tags:
+    - attack.defense-evasion
+    - attack.t1689
+    - analytic.an0995
+    - detection.det0350
+---
+
+title: File and Directory Permissions Modification (AN1177)
+id: b184867a-f715-489c-bf64-47e73946f5b9
+status: experimental
+description: Detects the execution of permission-modifying utilities with suspicious parameters indicating privilege escalation intent.
+author: Krishna Gupta
+date: 2026-06-09
+logsource:
+    category: process_creation
+    product: windows
+    # Relies on Sysmon Event ID 1
+detection:
+    selection_tools:
+        Image|endswith:
+            - '\icacls.exe'
+            - '\takeown.exe'
+            - '\cacls.exe'
+    selection_args:
+        CommandLine|contains:
+            - '/grant'
+            - '/takeown'
+            - 'Set-Acl'
+            - 'Everyone:F'
+    condition: selection_tools and selection_args
+fields:
+    - Image
+    - OriginalFileName
+    - CommandLine
+    - ParentImage
+    - ParentCommandLine
+    - CurrentDirectory
+    - User
+    - LogonId
+falsepositives:
+    - System administrators managing file shares or restoring backups.
+    - Software installers configuring application directories.
+level: medium
+tags:
+    - attack.defense-evasion
+    - attack.t1222.001
+    - analytic.an1177
+    - detection.det0418
+---
+
+title: SIP and Trust Provider Hijacking (AN1222)
+id: 7a8a1ac5-21a4-4f2b-a48b-f55ae2c9f8eb
+status: experimental
+description: Detects abnormal registry modifications to Subject Interface Packages (SIPs) and Trust Providers.
+author: Krishna Gupta
+date: 2026-06-09
+logsource:
+    category: registry_set
+    product: windows
+    # Relies on Sysmon Event ID 13
+detection:
+    selection_keys:
+        TargetObject|contains:
+            - 'SOFTWARE\Microsoft\Cryptography\Providers\Trust'
+            - 'SOFTWARE\Microsoft\Cryptography\OID\EncodingType 0\CryptSIPDll'
+    condition: selection_keys
+fields:
+    - Image
+    - OriginalFileName
+    - CommandLine
+    - TargetObject
+    - Details
+    - User
+    - LogonId
+falsepositives:
+    - Installation of legitimate third-party security software or custom trust providers.
+    - Major Windows OS upgrades patching cryptographic components.
+level: high
+tags:
+    - attack.defense-evasion
+    - attack.t1553.003
+    - analytic.an1222
+    - detection.det0442
+---
+
+title: Subvert Trust Controls - Malicious Root Cert Install (AN1246)
+id: 6cdfb844-2957-47f8-bcb4-22b791b10df3
+status: experimental
+description: Detects abnormal installation of root or code-signing certificates using certutil.exe.
+author: Krishna Gupta
+date: 2026-06-09
+logsource:
+    category: process_creation
+    product: windows
+    # Relies on Sysmon Event ID 1
+detection:
+    selection_img:
+        Image|endswith: '\certutil.exe'
+    selection_cmd:
+        CommandLine|contains|all:
+            - '-addstore'
+            - 'Root'
+    condition: selection_img and selection_cmd
+fields:
+    - Image
+    - OriginalFileName
+    - CommandLine
+    - ParentImage
+    - ParentCommandLine
+    - CurrentDirectory
+    - User
+    - LogonId
+falsepositives:
+    - Legitimate administration scripts deploying corporate PKI root certificates.
+level: high
+tags:
+    - attack.defense-evasion
+    - attack.t1553
+    - analytic.an1246
+    - detection.det0452
+---
+
+title: CLI Domain Trust Modification Command (AN1259-A)
+id: acaf84c8-14e5-4844-83fa-4189b8375f5a
+status: experimental
+description: Detects process executions attempting to modify or query Active Directory domain trust relationships.
+author: Krishna Gupta
+date: 2026-06-30
+logsource:
+    category: process_creation
+    product: windows
+detection:
+    selection_netdom:
+        Image|endswith: '\netdom.exe'
+    selection_netdom_orig:
+        OriginalFileName: 'netdom.exe'
+    selection_nltest:
+        Image|endswith: '\nltest.exe'
+    selection_nltest_orig:
+        OriginalFileName: 'nltest.exe'
+    selection_args:
+        CommandLine|contains:
+            - 'trust'
+            - '/domain_trusts'
+            - '/all_trusts'
+    selection_powershell:
+        CommandLine|contains:
+            - 'Get-ADTrust'
+            - 'New-ADTrust'
+            - 'Set-ADTrust'
+            - 'Remove-ADTrust'
+    condition: ((selection_netdom or selection_netdom_orig or selection_nltest or selection_nltest_orig) and selection_args) or selection_powershell
+fields:
+    - Image
+    - OriginalFileName
+    - CommandLine
+    - User
+falsepositives:
+    - Active Directory administrators conducting routine domain trust validations or additions during enterprise mergers.
+level: high
+tags:
+    - attack.defense-impairment
+    - attack.t1484.002
+    - analytic.an1259
+    - detection.det0458
+---
+
+title: LSA Password Filter DLL Registration (AN1303-A)
+id: eafa4919-261c-47c0-b9cf-43f70bd788ea
+status: experimental
+description: Detects registry modifications to the Notification Packages key used to load password filters in LSASS.
+author: Krishna Gupta
+date: 2026-06-30
+logsource:
+    category: registry_set
+    product: windows
+detection:
+    selection_lsa:
+        TargetObject|endswith: 'SYSTEM\CurrentControlSet\Control\Lsa\Notification Packages'
+    filter_clean_baselines:
+        # Match only exact standard baseline lists
+        Details:
+            - 'scecli rassfm kdcsvc'
+            - 'scecli rassfm'
+            - 'scecli'
+    condition: selection_lsa and not filter_clean_baselines
+fields:
+    - TargetObject
+    - Details
+    - User
+falsepositives:
+    - Installation of legitimate enterprise password enforcement agents (e.g., AD self-service reset tools).
+level: high
+tags:
+    - attack.defense-impairment
+    - attack.t1556.002
+    - analytic.an1303
+    - detection.det0472
+---
+
+title: Disable or Modify Tools - Kill Security Process (AN1369)
+id: 009be846-9c9b-4005-b7e5-0ef2e0fab8ac
+status: experimental
+description: Detects command-line execution attempting to stop services or kill processes associated with security tools (AV, EDR, Sysmon).
+author: Krishna Gupta
+date: 2026-06-09
+logsource:
+    category: process_creation
+    product: windows
+    # Relies on Sysmon Event ID 1
+detection:
+    selection_tool:
+        Image|endswith:
+            - '\taskkill.exe'
+            - '\net.exe'
+            - '\net1.exe'
+            - '\sc.exe'
+    selection_target:
+        CommandLine|contains:
+            - 'WinDefend'
+            - 'MsMpEng'
+            - 'Sysmon'
+            - 'Sentinel'
+            - 'CrowdStrike'
+    condition: selection_tool and selection_target
+fields:
+    - Image
+    - OriginalFileName
+    - CommandLine
+    - ParentImage
+    - ParentCommandLine
+    - CurrentDirectory
+    - User
+    - LogonId
+falsepositives:
+    - System administrators uninstalling or upgrading endpoint security software.
+level: high
+tags:
+    - attack.defense-evasion
+    - attack.t1685
+    - analytic.an1369
+    - detection.det0497
+---
+
+title: Code Signing Policy Modification - Bcdedit DSE Disable (AN1446)
+id: 778d3d6c-37a4-4366-9df1-265b3dd41a5f
+status: experimental
+description: Detects command-line execution of bcdedit.exe attempting to disable Driver Signature Enforcement or enable test signing.
+author: Krishna Gupta
+date: 2026-06-09
+logsource:
+    category: process_creation
+    product: windows
+    # Relies on Sysmon Event ID 1
+detection:
+    selection_img:
+        Image|endswith: '\bcdedit.exe'
+    selection_cmd:
+        CommandLine|contains:
+            - 'loadoptions DDISABLE_INTEGRITY_CHECKS'
+            - 'testsigning on'
+            - 'nointegritychecks on'
+    condition: selection_img and selection_cmd
+fields:
+    - Image
+    - OriginalFileName
+    - CommandLine
+    - ParentImage
+    - ParentCommandLine
+    - CurrentDirectory
+    - User
+    - LogonId
+falsepositives:
+    - Kernel developers testing custom unsigned drivers on non-production development machines.
+level: high
+tags:
+    - attack.defense-evasion
+    - attack.t1553.006
+    - analytic.an1446
+    - detection.det0523
+---
+
+title: Clear Windows Event Logs - CLI Utilities (AN1472)
+id: 0640f459-b180-45de-be63-692ba83592b5
+status: experimental
+description: Detects command-line activity using wevtutil.exe or PowerShell to clear Windows event logs.
+author: Krishna Gupta
+date: 2026-06-09
+logsource:
+    category: process_creation
+    product: windows
+    # Relies on Sysmon Event ID 1
+detection:
+    selection_wevtutil:
+        Image|endswith: '\wevtutil.exe'
+        CommandLine|contains|all:
+            - 'cl'
+            - 'Security'
+    selection_powershell:
+        Image|endswith:
+            - '\powershell.exe'
+            - '\pwsh.exe'
+        CommandLine|contains:
+            - 'Clear-EventLog'
+            - 'Remove-EventLog'
+    condition: selection_wevtutil or selection_powershell
+fields:
+    - Image
+    - OriginalFileName
+    - CommandLine
+    - ParentImage
+    - ParentCommandLine
+    - CurrentDirectory
+    - User
+    - LogonId
+falsepositives:
+    - Administrative scripts performing automated log rotation (rare in modern environments due to built-in log wrapping).
+level: high
+tags:
+    - attack.defense-evasion
+    - attack.t1685.005
+    - analytic.an1472
+    - detection.det0532
+---
+
+title: Prevent Command History Logging - Set-PSReadLineOption (AN1557)
+id: 3ff7cdd2-71d6-45b6-91a5-2db7e948fce5
+status: experimental
+description: Detects PowerShell commands altering PSReadLine options to disable history saving, a common evasion technique.
+author: Krishna Gupta
+date: 2026-06-09
+logsource:
+    category: ps_script
+    product: windows
+    # Relies on PowerShell Script Block Logging (Event ID 4104) or Command Line (Event ID 1)
+detection:
+    selection_cmd:
+        - CommandLine|contains|all:
+            - 'Set-PSReadLineOption'
+            - 'SaveNothing'
+        - ScriptBlockText|contains|all:
+            - 'Set-PSReadLineOption'
+            - 'SaveNothing'
+    condition: selection_cmd
+fields:
+    - ScriptBlockText
+falsepositives:
+    - Privacy-conscious administrators or developers intentionally disabling history on jump boxes.
+level: high
+tags:
+    - attack.defense-evasion
+    - attack.t1690
+    - analytic.an1557
+    - detection.det0563
+---
+
+title: Network Provider DLL Registry Modification (AN1598-A)
+id: 68e852d9-fe20-4717-a096-3acd02a144a4
+status: experimental
+description: Detects registry modifications to the ProviderOrder or ProviderPath keys under NetworkProvider services.
+author: Krishna Gupta
+date: 2026-06-30
+logsource:
+    category: registry_set
+    product: windows
+detection:
+    selection_provider_path:
+        TargetObject|contains:
+            - 'System\CurrentControlSet\Services\'
+        TargetObject|endswith:
+            - '\NetworkProvider\ProviderPath'
+    selection_provider_order:
+        TargetObject|endswith:
+            - 'System\CurrentControlSet\Control\NetworkProvider\Order\ProviderOrder'
+    filter_standard_order:
+        TargetObject|endswith: 'System\CurrentControlSet\Control\NetworkProvider\Order\ProviderOrder'
+        Details:
+            - 'LanmanWorkstation,RDPNP,webclient'
+            - 'LanmanWorkstation,RDPNP'
+    filter_standard_paths:
+        TargetObject|endswith: 'NetworkProvider\ProviderPath'
+        Details:
+            - 'C:\Windows\System32\ntlanman.dll'
+            - 'C:\Windows\System32\rdpnp.dll'
+            - 'C:\Windows\System32\davclnt.dll'
+    condition: (selection_provider_path and not filter_standard_paths) or (selection_provider_order and not filter_standard_order)
+fields:
+    - TargetObject
+    - Details
+    - User
+falsepositives:
+    - Installation of legitimate network providers (e.g. third-party VPN clients, cloud storage mounts, or virtualization tools like VMware/VirtualBox).
+level: high
+tags:
+    - attack.defense-impairment
+    - attack.t1556.008
+    - analytic.an1598
+    - detection.det0580
+---
+
+title: Reversible Encryption Enabled on User Account (AN1621-A)
+id: 736dcb6b-a838-421c-8012-5408468226d4
+status: experimental
+description: Detects Windows Security Event ID 4738 indicating the "Store password using reversible encryption" option was enabled on an account.
+author: Krishna Gupta
+date: 2026-06-30
+logsource:
+    product: windows
+    service: security
+detection:
+    selection_event:
+        EventID: 4738
+    selection_uac_flags:
+        # Check standard combined UserAccountControl values that have the reversible encryption bit (128 / 0x80) enabled
+        UserAccountControl:
+            - '640'
+            - '672'
+            - '66176'
+            - '66208'
+            - '2176'
+            - '4224'
+            - '8320'
+            - '0x280'
+            - '0x2A0'
+            - '0x10280'
+            - '0x102A0'
+            - '0x880'
+            - '0x1080'
+            - '0x2080'
+    condition: selection_event and selection_uac_flags
+fields:
+    - TargetUserName
+    - SubjectUserName
+    - UserAccountControl
+    - SubjectDomainName
+falsepositives:
+    - Administrative configuration for legacy protocols (like IIS Digest Authentication) that require reversible encryption.
+level: high
+tags:
+    - attack.defense-impairment
+    - attack.t1556.005
+    - analytic.an1621
+    - detection.det0589
+---
+
+title: Disable or Modify Windows Host Firewall (AN2043)
+id: c06d852b-728a-4d5e-8991-de085fc37821
+status: experimental
+description: Detects command-line execution of netsh or PowerShell attempting to modify Windows Firewall rules or profiles.
+author: Krishna Gupta
+date: 2026-06-09
+logsource:
+    category: process_creation
+    product: windows
+    # Relies on Sysmon Event ID 1
+detection:
+    selection_netsh:
+        Image|endswith: '\netsh.exe'
+        CommandLine|contains|all:
+            - 'advfirewall'
+            - 'firewall'
+        CommandLine|contains:
+            - 'add rule'
+            - 'set rule'
+            - 'delete rule'
+            - 'set currentprofile'
+            - 'state=off'
+    selection_powershell:
+        Image|endswith:
+            - '\powershell.exe'
+            - '\pwsh.exe'
+        CommandLine|contains:
+            - 'New-NetFirewallRule'
+            - 'Set-NetFirewallRule'
+            - 'Remove-NetFirewallRule'
+            - 'Set-NetFirewallProfile'
+    condition: selection_netsh or selection_powershell
+fields:
+    - Image
+    - OriginalFileName
+    - CommandLine
+    - ParentImage
+    - ParentCommandLine
+    - CurrentDirectory
+    - User
+    - LogonId
+falsepositives:
+    - IT administrators configuring network access for new applications.
+    - Software installers automatically adding necessary firewall exceptions during deployment.
+level: high
+tags:
+    - attack.defense-evasion
+    - attack.t1686.003
+    - analytic.an2043
+    - detection.det0901
+---
+
+title: Loading of Suspicious DLL from User-Writable Directory (AN0052)
+id: 410075f4-f702-40e3-9734-9e931aa13462
+status: experimental
+description: Detects a process loading a shared module (DLL) located in user-writable directories (like AppData, Temp, or Public), which may indicate DLL side-loading or search order hijacking.
+author: Krishna Gupta
+date: 2026-06-07
+logsource:
+    category: image_load
+    product: windows
+    # Relies on Sysmon Event ID 7
+detection:
+    selection_paths:
+        ImageLoaded|contains:
+            - '\AppData\Local\Temp\'
+            - '\Users\Public\'
+            - '\Windows\Temp\'
+            - '\AppData\Roaming\'
+    selection_processes:
+        Image|endswith:
+            - '\explorer.exe'
+            - '\svchost.exe'
+            - '\cmd.exe'
+            - '\powershell.exe'
+            - '\rundll32.exe'
+            - '\regsvr32.exe'
+            - '\mshta.exe'
+    selection_signature:
+        Signed: 'false'
+    condition: selection_paths and selection_processes and selection_signature
+fields:
+    - Image
+    - ImageLoaded
+    - Signed
+    - SignatureStatus
+falsepositives:
+    - Legitimate software installed in user directories (like local profile applications) loading local DLLs.
+level: high
+tags:
+    - attack.execution
+    - attack.t1129
+    - analytic.an0052
+    - detection.det0018
+---
+
+title: Elevated Execution from Weak Permissions Installer Directory (AN0108)
+id: d71b4098-63d6-4bbc-9086-271f5b304d8f
+status: experimental
+description: Detects when processes are launched under elevated contexts (High or System Integrity) from user-writable installer or temporary directories, indicating potential exploitation of installer path permission weaknesses.
+author: Krishna Gupta
+date: 2026-06-07
+logsource:
+    category: process_creation
+    product: windows
+    # Relies on Sysmon Event ID 1
+detection:
+    selection_paths:
+        Image|contains:
+            - '\AppData\Local\Temp\'
+            - '\Users\Public\'
+            - '\Windows\Temp\'
+            - '\AppData\Roaming\'
+            - '\Downloads\'
+    selection_integrity:
+        IntegrityLevel:
+            - 'High'
+            - 'System'
+    filter_known_installers:
+        - CommandLine|contains:
+            - 'nativeimages'
+            - 'PackageStaging'
+        - Image|endswith:
+            - '\msiexec.exe'
+            - '\setup.exe'
+            - '\install.exe'
+    condition: selection_paths and selection_integrity and not filter_known_installers
+fields:
+    - Image
+    - OriginalFileName
+    - CommandLine
+    - ParentImage
+    - ParentCommandLine
+    - CurrentDirectory
+    - User
+    - LogonId
+falsepositives:
+    - Legitimate administrative software installers executing unpacking operations and running child configuration scripts with elevated privileges in local temp folders.
+level: high
+tags:
+    - attack.execution
+    - attack.persistence
+    - attack.privilege-escalation
+    - attack.t1574.005
+    - analytic.an0108
+    - detection.det0038
+---
+
+title: Exploitation for Client Execution - Suspicious Child Process (AN0797)
+id: 5ecb2d76-87f6-43e9-baa8-2b9a1123ddde
+status: experimental
+description: Detects a cause-and-effect chain where a client app (Office, PDF reader, browser) spawns an unexpected child process, indicating successful exploitation.
+author: Krishna Gupta
+date: 2026-06-09
+logsource:
+    category: process_creation
+    product: windows
+    # Relies on Sysmon Event ID 1
+detection:
+    selection_parent:
+        ParentImage|endswith:
+            - '\winword.exe'
+            - '\excel.exe'
+            - '\powerpnt.exe'
+            - '\AcroRd32.exe'
+            - '\iexplore.exe'
+            - '\chrome.exe'
+            - '\foxitreader.exe'
+    selection_child:
+        Image|endswith:
+            - '\cmd.exe'
+            - '\powershell.exe'
+            - '\wscript.exe'
+            - '\cscript.exe'
+            - '\mshta.exe'
+            - '\rundll32.exe'
+            - '\regsvr32.exe'
+    condition: selection_parent and selection_child
+fields:
+    - Image
+    - OriginalFileName
+    - CommandLine
+    - ParentImage
+    - ParentCommandLine
+    - CurrentDirectory
+    - User
+    - LogonId
+falsepositives:
+    - Legitimate Office macros invoking shells for system administration tasks.
+    - PDF readers opening embedded links that legitimately launch helper apps.
+level: critical
+tags:
+    - attack.execution
+    - attack.t1203
+    - analytic.an0797
+    - detection.det0287
+---
+
+title: Office Application Spawning Living-off-the-Land Binaries (AN1314-A)
+id: db35953a-37ec-42e5-a76f-0a3501f83e24
+status: experimental
+description: Detects command shells or administrative LOLBINs spawned directly by Office or PDF viewer parent processes.
+author: Krishna Gupta
+date: 2026-06-30
+logsource:
+    category: process_creation
+    product: windows
+detection:
+    selection_parents:
+        ParentImage|endswith:
+            - '\winword.exe'
+            - '\excel.exe'
+            - '\powerpnt.exe'
+            - '\acrord32.exe'
+    selection_images:
+        Image|endswith:
+            - '\cmd.exe'
+            - '\powershell.exe'
+            - '\pwsh.exe'
+            - '\mshta.exe'
+            - '\msiexec.exe'
+            - '\rundll32.exe'
+            - '\cscript.exe'
+            - '\wscript.exe'
+            - '\regsvr32.exe'
+    condition: selection_parents and selection_images
+fields:
+    - Image
+    - CommandLine
+    - ParentImage
+    - User
+falsepositives:
+    - Office plugins or document helpers initiating authorized application integrations.
+level: critical
+tags:
+    - attack.execution
+    - attack.t1204
+    - analytic.an1314
+    - detection.det0478
+---
+
+title: Anomalous Named Pipe Creation (AN1357-A)
+id: 4534987c-f015-4683-b3b4-f8215e81ff6f
+status: experimental
+description: Detects Sysmon Event ID 17 named pipe creation events pointing to post-exploitation frameworks or anomalous prefixes.
+author: Krishna Gupta
+date: 2026-06-30
+logsource:
+    category: pipe_created
+    product: windows
+detection:
+    selection_pipes:
+        PipeName|contains:
+            - '\postex_'
+            - '\status_'
+            - '\msagent_'
+            - '\msse-'
+            - '\spooler_'
+            - '\lsass_'
+    filter_system:
+        # Exclude standard built-in spooler or LSASS calls
+        Image|endswith:
+            - '\system32\spoolsv.exe'
+            - '\system32\lsass.exe'
+            - '\system32\services.exe'
+    condition: selection_pipes and not filter_system
+fields:
+    - PipeName
+    - Image
+    - User
+falsepositives:
+    - Diagnostic packages mimicking standard pipe structures (rare).
+level: critical
+tags:
+    - attack.execution
+    - attack.t1559
+    - analytic.an1357
+    - detection.det0493
+---
+
+title: Office Application Spawning Shell via DDE (AN1393-A)
+id: 623f6147-7279-4348-ae9f-4d742b9bf050
+status: experimental
+description: Detects Office binaries launching cmd/powershell shells, suggesting active DDE code execution.
+author: Krishna Gupta
+date: 2026-06-30
+logsource:
+    category: process_creation
+    product: windows
+detection:
+    selection_parents:
+        ParentImage|endswith:
+            - '\winword.exe'
+            - '\excel.exe'
+            - '\powerpnt.exe'
+    selection_images:
+        Image|endswith:
+            - '\cmd.exe'
+            - '\powershell.exe'
+            - '\pwsh.exe'
+            - '\mshta.exe'
+            - '\wscript.exe'
+            - '\cscript.exe'
+    condition: selection_parents and selection_images
+fields:
+    - Image
+    - CommandLine
+    - ParentImage
+    - User
+falsepositives:
+    - Automated document updates containing legacy administrative macros (uncommon).
+level: critical
+tags:
+    - attack.execution
+    - attack.t1559.002
+    - analytic.an1393
+    - detection.det0504
+---
+
+title: Hook Evasion via Non-Standard System DLL Load (AN1465-A)
+id: d76e3797-e914-45b6-8f9f-aed2f03dd4cc
+status: experimental
+description: Detects processes loading critical system libraries from non-standard directories to bypass API hooking engines.
+author: Krishna Gupta
+date: 2026-06-30
+logsource:
+    category: image_load
+    product: windows
+detection:
+    selection_dll:
+        ImageLoaded|endswith:
+            - '\ntdll.dll'
+            - '\kernel32.dll'
+            - '\kernelbase.dll'
+    filter_standard_paths:
+        ImageLoaded|startswith:
+            - 'C:\Windows\System32\'
+            - 'C:\Windows\SysWOW64\'
+            - 'C:\Windows\WinSxS\'
+    condition: selection_dll and not filter_standard_paths
+fields:
+    - Image
+    - ImageLoaded
+    - User
+falsepositives:
+    - Custom diagnostic tools packaged with local runtime dll engines (rare for ntdll/kernel32).
+level: critical
+tags:
+    - attack.execution
+    - attack.t1106
+    - analytic.an1465
+    - detection.det0529
+---
+
+title: Archive File Creation on Removable Media (AN0342)
+id: 59eea0cb-d0d9-4156-80eb-cde1cd12fd04
+status: experimental
+description: Detects the creation or writing of compressed archive files (such as .zip, .rar, .7z) onto removable storage drive paths (e.g. D:, E:, F:, G:, H:\), which may indicate staging data for physical exfiltration.
+author: Krishna Gupta
+date: 2026-06-07
+logsource:
+    category: file_event
+    product: windows
+detection:
+    selection_paths:
+        TargetFilename|startswith:
+            - 'D:\'
+            - 'E:\'
+            - 'F:\'
+            - 'G:\'
+            - 'H:\'
+            - 'I:\'
+            - 'J:\'
+    selection_archives:
+        TargetFilename|endswith:
+            - '.zip'
+            - '.rar'
+            - '.7z'
+            - '.tar'
+            - '.cab'
+            - '.tgz'
+            - '.iso'
+    condition: selection_paths and selection_archives
+fields:
+    - Image
+    - TargetFilename
+    - User
+    - LogonId
+falsepositives:
+    - Legitimate users saving archives or backing up data to USB flash drives or external drives.
+level: medium
+tags:
+    - attack.exfiltration
+    - attack.t1052
+    - analytic.an0342
+    - detection.det0123
+---
+
+title: Outbound Alternative Protocol Exfiltration via CLI (AN0367)
+id: 56b8b30f-0373-41b4-987a-30d202d8088b
+status: experimental
+description: Detects command line tools or scripting engines initiating outbound network connections over alternative protocols such as FTP (21), SMTP (25/587), or external SMB (445).
+author: Krishna Gupta
+date: 2026-06-07
+logsource:
+    category: network_connection
+    product: windows
+detection:
+    selection_process:
+        Image|endswith:
+            - '\cmd.exe'
+            - '\powershell.exe'
+            - '\pwsh.exe'
+            - '\rundll32.exe'
+            - '\wscript.exe'
+            - '\cscript.exe'
+    selection_ports:
+        DestinationPort:
+            - 21  # FTP
+            - 25  # SMTP
+            - 465 # SMTPS
+            - 587 # SMTP Submission
+            - 445 # SMB
+    filter_local_smb:
+        DestinationIp|startswith:
+            - '10.'
+            - '192.168.'
+            - '172.16.'
+            - '172.17.'
+            - '172.18.'
+            - '172.19.'
+            - '172.2'
+            - '172.3'
+            - '127.'
+            - 'fe80:'
+            - '::1'
+    condition: selection_process and selection_ports and not filter_local_smb
+fields:
+    - Image
+    - CommandLine
+    - User
+    - LogonId
+    - Initiated
+    - SourceIp
+    - DestinationIp
+    - DestinationPort
+falsepositives:
+    - Administrative scripts sending automated alerts or connecting to external vendor FTP servers.
+level: high
+tags:
+    - attack.exfiltration
+    - attack.t1048
+    - analytic.an0367
+    - detection.det0131
+---
+
+title: Exfiltration - Outbound Unencrypted Connection by Scripting Host (AN0423)
+id: e98bf5a3-17b2-4340-bd3f-bc21400db1b1
+status: experimental
+description: Detects command interpreters or scripting utilities (PowerShell, cscript, wscript) initiating network connections over unencrypted ports (80, 21, 25) to external IP addresses.
+author: Krishna Gupta
+date: 2026-06-08
+logsource:
+    category: network_connection
+    product: windows
+    # Relies on Sysmon Event ID 3
+detection:
+    selection_process:
+        Image|endswith:
+            - '\powershell.exe'
+            - '\pwsh.exe'
+            - '\wscript.exe'
+            - '\cscript.exe'
+            - '\cmd.exe'
+    selection_ports:
+        DestinationPort:
+            - 21 # FTP
+            - 25 # SMTP
+            - 80 # HTTP
+    filter_internal:
+        DestinationIp|startswith:
+            - '10.'
+            - '192.168.'
+            - '172.16.'
+            - '172.17.'
+            - '172.18.'
+            - '172.19.'
+            - '172.2'
+            - '172.3'
+            - '127.'
+            - '169.254.'
+    condition: selection_process and selection_ports and not filter_internal
+fields:
+    - Image
+    - CommandLine
+    - User
+    - LogonId
+    - Initiated
+    - SourceIp
+    - DestinationIp
+    - DestinationPort
+falsepositives:
+    - Administrative scripts executing HTTP queries to download public updates or syncing time via NTP.
+    - Automated system backup tools transferring statistics to internal monitoring servers.
+level: high
+tags:
+    - attack.exfiltration
+    - attack.t1048.003
+    - analytic.an0423
+    - detection.det0149
+---
+
+title: Outbound Data Exfiltration via Webhooks (AN0436)
+id: 300a803c-192a-496c-af55-a3d0096148c8
+status: experimental
+description: Detects command-line interpreters, scripting hosts, or file transfer tools initiating network connections to known webhook receiver domains (e.g., Discord, Slack, Webhook.site), which may indicate data exfiltration.
+author: Krishna Gupta
+date: 2026-06-07
+logsource:
+    category: network_connection
+    product: windows
+detection:
+    selection_process:
+        Image|endswith:
+            - '\powershell.exe'
+            - '\pwsh.exe'
+            - '\cmd.exe'
+            - '\wscript.exe'
+            - '\cscript.exe'
+            - '\curl.exe'
+    selection_domains:
+        DestinationHostname|contains:
+            - 'webhook.site'
+            - 'hooks.slack.com'
+            - 'discord.com'
+            - 'discordapp.com'
+    condition: selection_process and selection_domains
+fields:
+    - Image
+    - CommandLine
+    - User
+    - LogonId
+    - Initiated
+    - SourceIp
+    - DestinationIp
+    - DestinationPort
+falsepositives:
+    - Legitimate administrative scripts sending automated system notifications to Slack channels.
+level: high
+tags:
+    - attack.exfiltration
+    - attack.t1567.004
+    - analytic.an0436
+    - detection.det0153
+---
+
+title: File Copy to USB Storage via CLI (AN0616)
+id: 406e96c0-fa93-47d1-ac3d-b486c44808e9
+status: experimental
+description: Detects command line execution of file copy utilities (xcopy, robocopy) or scripting engines writing files to USB/removable storage drive letters.
+author: Krishna Gupta
+date: 2026-06-07
+logsource:
+    category: file_event
+    product: windows
+detection:
+    selection_process:
+        Image|endswith:
+            - '\xcopy.exe'
+            - '\robocopy.exe'
+            - '\powershell.exe'
+            - '\cmd.exe'
+    selection_paths:
+        TargetFilename|startswith:
+            - 'D:\'
+            - 'E:\'
+            - 'F:\'
+            - 'G:\'
+            - 'H:\'
+            - 'I:\'
+            - 'J:\'
+    condition: selection_process and selection_paths
+fields:
+    - Image
+    - TargetFilename
+    - User
+    - LogonId
+falsepositives:
+    - Legitimate IT administration or users manually backing up files using command line copy tools to external media.
+level: medium
+tags:
+    - attack.exfiltration
+    - attack.t1052.001
+    - analytic.an0616
+    - detection.det0220
+---
+
+title: Outbound Data Exfiltration to Paste Sites via CLI (AN0787)
+id: 25d394b3-5f4e-4a6d-a099-2580c141c560
+status: experimental
+description: Detects command-line interpreters, scripting hosts, or file transfer tools initiating network connections or DNS queries to known paste sites (e.g., Pastebin, Hastebin), which may indicate data exfiltration.
+author: Krishna Gupta
+date: 2026-06-07
+logsource:
+    category: network_connection
+    product: windows
+detection:
+    selection_process:
+        Image|endswith:
+            - '\powershell.exe'
+            - '\pwsh.exe'
+            - '\cmd.exe'
+            - '\wscript.exe'
+            - '\cscript.exe'
+            - '\curl.exe'
+    selection_domains:
+        DestinationHostname|contains:
+            - 'pastebin.com'
+            - 'hastebin.com'
+            - 'ghostbin.co'
+            - 'paste.ee'
+            - 'controlc.com'
+    condition: selection_process and selection_domains
+fields:
+    - Image
+    - CommandLine
+    - User
+    - LogonId
+    - Initiated
+    - SourceIp
+    - DestinationIp
+    - DestinationPort
+falsepositives:
+    - Highly unlikely in standard enterprise environments. Some administration scripts may query paste sites for update configs.
+level: high
+tags:
+    - attack.exfiltration
+    - attack.t1567.003
+    - analytic.an0787
+    - detection.det0284
+---
+
+title: Outbound Data Exfiltration to Code Repository via CLI (AN0895)
+id: cc4c7677-9202-4377-8753-7a96ef06288a
+status: experimental
+description: Detects command-line interpreters, scripting hosts, or file transfer tools initiating network connections or DNS queries to known public code repository domains (e.g. GitHub, GitLab, Bitbucket), which may indicate data exfiltration.
+author: Krishna Gupta
+date: 2026-06-07
+logsource:
+    category: network_connection
+    product: windows
+detection:
+    selection_process:
+        Image|endswith:
+            - '\powershell.exe'
+            - '\pwsh.exe'
+            - '\cmd.exe'
+            - '\wscript.exe'
+            - '\cscript.exe'
+            - '\curl.exe'
+    selection_domains:
+        DestinationHostname|contains:
+            - 'github.com'
+            - 'gitlab.com'
+            - 'bitbucket.org'
+            - 'githubusercontent.com'
+    condition: selection_process and selection_domains
+fields:
+    - Image
+    - CommandLine
+    - User
+    - LogonId
+    - Initiated
+    - SourceIp
+    - DestinationIp
+    - DestinationPort
+falsepositives:
+    - Software developers pushing legitimate code updates to corporate repository accounts using scripts or command line git tools.
+level: medium
+tags:
+    - attack.exfiltration
+    - attack.t1567.001
+    - analytic.an0895
+    - detection.det0318
+---
+
+title: Exfiltration - Outbound Network Connection from Suspicious Path (AN0988)
+id: d545fb57-5927-4c59-a714-7099fe020518
+status: experimental
+description: Detects processes executing from temp, user appdata, or public directories initiating outbound TCP/UDP connections to external networks, which could indicate data exfiltration over a C2 channel.
+author: Krishna Gupta
+date: 2026-06-08
+logsource:
+    category: network_connection
+    product: windows
+    # Relies on Sysmon Event ID 3
+detection:
+    selection_path:
+        Image|contains:
+            - '\AppData\Local\Temp\'
+            - '\Windows\Temp\'
+            - '\Users\Public\'
+            - '\PerfLogs\'
+    filter_internal:
+        DestinationIp|startswith:
+            - '10.'
+            - '192.168.'
+            - '172.16.'
+            - '172.17.'
+            - '172.18.'
+            - '172.19.'
+            - '172.2'
+            - '172.3'
+            - '127.'
+            - '169.254.'
+    condition: selection_path and not filter_internal
+fields:
+    - Image
+    - CommandLine
+    - User
+    - LogonId
+    - Initiated
+    - SourceIp
+    - DestinationIp
+    - DestinationPort
+falsepositives:
+    - Legitimate software auto-updaters (running out of AppData\Local\Temp) downloading application updates.
+    - User-run portable applications initiating connections for sync or updates.
+level: high
+tags:
+    - attack.exfiltration
+    - attack.t1041
+    - analytic.an0988
+    - detection.det0348
+---
+
+title: Automated Archiving and Staging via CLI (AN1113)
+id: c330cb77-2e87-43d9-b0bd-e18c86898f7c
+status: experimental
+description: Detects command-line archiving utilities being spawned by command shells or task schedulers, which may indicate automated data harvesting and staging for exfiltration.
+author: Krishna Gupta
+date: 2026-06-07
+logsource:
+    category: process_creation
+    product: windows
+detection:
+    selection_parent:
+        ParentImage|endswith:
+            - '\powershell.exe'
+            - '\pwsh.exe'
+            - '\cmd.exe'
+            - '\taskeng.exe'
+            - '\svchost.exe'
+    selection_archive_image:
+        Image|endswith:
+            - '\7z.exe'
+            - '\7za.exe'
+            - '\rar.exe'
+            - '\zip.exe'
+            - '\tar.exe'
+            - '\makecab.exe'
+    selection_archive_original:
+        OriginalFileName:
+            - '7z.exe'
+            - '7za.exe'
+            - 'rar.exe'
+            - 'zip.exe'
+            - 'tar.exe'
+            - 'makecab.exe'
+    condition: selection_parent and (selection_archive_image or selection_archive_original)
+fields:
+    - Image
+    - OriginalFileName
+    - CommandLine
+    - ParentImage
+    - ParentCommandLine
+    - CurrentDirectory
+    - User
+    - LogonId
+falsepositives:
+    - Legitimate administrative backup scripts, database backups, or software build tools performing automated file archiving.
+level: medium
+tags:
+    - attack.exfiltration
+    - attack.t1020
+    - analytic.an1113
+    - detection.det0397
+---
+
+title: Scheduled File Transfer via CLI (AN1118)
+id: a8236e50-51be-47e5-8409-2e7a9a548082
+status: experimental
+description: Detects command-line execution of file transfer commands or scripting hosts spawned by task schedulers, which may indicate scheduled exfiltration attempts.
+author: Krishna Gupta
+date: 2026-06-07
+logsource:
+    category: process_creation
+    product: windows
+detection:
+    selection_parent:
+        ParentImage|endswith:
+            - '\taskeng.exe'
+    selection_cmd:
+        Image|endswith:
+            - '\powershell.exe'
+            - '\pwsh.exe'
+            - '\cmd.exe'
+            - '\curl.exe'
+    selection_args:
+        CommandLine|contains:
+            - 'curl'
+            - 'wget'
+            - 'UploadFile'
+            - 'ftp'
+            - 'sftp'
+            - 'scp'
+            - 'Invoke-WebRequest'
+            - 'Invoke-RestMethod'
+    condition: selection_parent and selection_cmd and selection_args
+fields:
+    - Image
+    - OriginalFileName
+    - CommandLine
+    - ParentImage
+    - ParentCommandLine
+    - CurrentDirectory
+    - User
+    - LogonId
+falsepositives:
+    - Legitimate enterprise synchronization scripts, monitoring tools, or software update check-ins.
+level: medium
+tags:
+    - attack.exfiltration
+    - attack.t1029
+    - analytic.an1118
+    - detection.det0399
+---
+
+title: Cryptographic DLL Loaded by Scripting Host (AN1389)
+id: 2cdc6dd4-fcf6-4220-8236-fc972871557c
+status: experimental
+description: Detects command-line interpreters or scripting hosts loading Windows cryptographic libraries (e.g., bcryptprimitives.dll, cryptsp.dll), which may indicate symmetric encryption of data prior to exfiltration.
+author: Krishna Gupta
+date: 2026-06-07
+logsource:
+    category: image_load
+    product: windows
+detection:
+    selection_process:
+        Image|endswith:
+            - '\powershell.exe'
+            - '\pwsh.exe'
+            - '\wscript.exe'
+            - '\cscript.exe'
+            - '\mshta.exe'
+            - '\cmd.exe'
+    selection_dll:
+        ImageLoaded|endswith:
+            - '\bcrypt.dll'
+            - '\bcryptprimitives.dll'
+            - '\cryptsp.dll'
+            - '\ncrypt.dll'
+    condition: selection_process and selection_dll
+fields:
+    - Image
+    - ImageLoaded
+    - Signed
+    - SignatureStatus
+falsepositives:
+    - Administrative scripts executing complex hashing routines (e.g. comparing file hashes using Get-FileHash) or managing secure password fields.
+level: medium
+tags:
+    - attack.exfiltration
+    - attack.t1048.001
+    - analytic.an1389
+    - detection.det0503
+---
+
+title: Exfiltration - Asymmetric Encryption of Data Archive (AN1413)
+id: 56ed2724-b294-4322-a1df-4174c18bd49c
+status: experimental
+description: Detects command-line parameters of cryptographic utilities (such as GnuPG, OpenSSL) or scripting utilities indicating asymmetric encryption of files, typically performed prior to exfiltration.
+author: Krishna Gupta
+date: 2026-06-08
+logsource:
+    category: process_creation
+    product: windows
+    # Relies on Sysmon Event ID 1
+detection:
+    selection_utilities:
+        - Image|endswith:
+            - '\gpg.exe'
+            - '\gpg2.exe'
+            - '\openssl.exe'
+        - OriginalFileName:
+            - 'gpg.exe'
+            - 'gpg2.exe'
+            - 'openssl.exe'
+    selection_gpg_args:
+        CommandLine|contains:
+            - ' -e' # encrypt
+            - ' --encrypt'
+            - ' -r' # recipient (asymmetric identifier)
+            - ' --recipient'
+    selection_openssl_args:
+        CommandLine|contains:
+            - ' rsautl'
+            - ' pkeyutl'
+            - ' -encrypt'
+    selection_powershell:
+        CommandLine|contains:
+            - 'Protect-CmsMessage'
+            - 'RSACryptoServiceProvider'
+            - 'System.Security.Cryptography.RSA'
+    condition: (selection_utilities and (selection_gpg_args or selection_openssl_args)) or selection_powershell
+fields:
+    - Image
+    - OriginalFileName
+    - CommandLine
+    - ParentImage
+    - ParentCommandLine
+    - CurrentDirectory
+    - User
+    - LogonId
+falsepositives:
+    - Legitimate administrative scripts encrypting database backups or logs before archiving them.
+    - Software developers signing or encrypting packages during standard release builds.
+level: medium
+tags:
+    - attack.exfiltration
+    - attack.t1048.002
+    - analytic.an1413
+    - detection.det0512
+---
+
+title: Exfiltration - Data Upload to Public Web Service (AN1511)
+id: 317f128d-a86a-452e-a057-789849c2b71f
+status: experimental
+description: Detects command-line interpreters or file transfer tools initiating network connections or sending HTTP requests to known pastebin or temporary file-sharing web services, which may indicate data exfiltration.
+author: Krishna Gupta
+date: 2026-06-08
+logsource:
+    category: network_connection
+    product: windows
+    # Relies on Sysmon Event ID 3/Event ID 1
+detection:
+    selection_process:
+        Image|endswith:
+            - '\powershell.exe'
+            - '\pwsh.exe'
+            - '\cmd.exe'
+            - '\curl.exe'
+            - '\wscript.exe'
+            - '\cscript.exe'
+    selection_domains_host:
+        DestinationHostname|contains:
+            - 'pastebin.com'
+            - 'paste.ee'
+            - 'hastebin.com'
+            - 'file.io'
+            - 'gofile.io'
+            - 'sendspace.com'
+            - 'anonfiles.com'
+            - 'transfer.sh'
+            - 'mega.nz'
+            - 'temp.sh'
+    selection_domains_cmd:
+        CommandLine|contains:
+            - 'pastebin'
+            - 'file.io'
+            - 'gofile'
+            - 'transfer.sh'
+            - ' -F ' # curl form-data upload flag
+            - ' -d ' # curl post data flag
+            - 'UploadFile'
+            - 'PostAsync'
+    condition: selection_process and (selection_domains_host or selection_domains_cmd)
+fields:
+    - Image
+    - CommandLine
+    - User
+    - LogonId
+    - Initiated
+    - SourceIp
+    - DestinationIp
+    - DestinationPort
+falsepositives:
+    - Developers using curl or PowerShell to share debugging logs or build outputs on public paste bins.
+    - Automated system status monitoring scripts configured to post status details to external developer dashboards.
+level: high
+tags:
+    - attack.exfiltration
+    - attack.t1567
+    - analytic.an1511
+    - detection.det0548
+---
+
+title: Exfiltration - Bluetooth File Transfer Wizard Execution (AN1531)
+id: a1aa945e-1864-4b44-9f33-51b0c6b1d9d6
+status: experimental
+description: Detects execution of the native Windows Bluetooth File Transfer Wizard (fsquirt.exe), which can be abused by insiders or threat actors to copy data to nearby mobile devices or laptops.
+author: Krishna Gupta
+date: 2026-06-08
+logsource:
+    category: process_creation
+    product: windows
+    # Relies on Sysmon Event ID 1
+detection:
+    selection_process_image:
+        Image|endswith:
+            - '\fsquirt.exe'
+    selection_process_original:
+        OriginalFileName:
+            - 'fsquirt.exe'
+    condition: selection_process_image or selection_process_original
+fields:
+    - Image
+    - OriginalFileName
+    - CommandLine
+    - ParentImage
+    - ParentCommandLine
+    - CurrentDirectory
+    - User
+    - LogonId
+falsepositives:
+    - Legitimate user transferring business files to an authorized corporate mobile device over Bluetooth.
+level: high
+tags:
+    - attack.exfiltration
+    - attack.t1011.001
+    - analytic.an1531
+    - detection.det0554
+---
+
+title: Exfiltration - Command-Line Cloud Storage Sync Execution (AN1571)
+id: ecdfcd2a-36d2-446d-9fdd-3432e813de47
+status: experimental
+description: Detects the execution of command-line cloud synchronization tools (like rclone, megacmd) or cloud provider CLI platforms (AWS, Azure) transferring files, indicating potential exfiltration.
+author: Krishna Gupta
+date: 2026-06-08
+logsource:
+    category: process_creation
+    product: windows
+    # Relies on Sysmon Event ID 1
+detection:
+    selection_utilities_image:
+        Image|endswith:
+            - '\rclone.exe'
+            - '\mega-cmd.exe'
+            - '\mega.exe'
+            - '\MegaSync.exe'
+            - '\aws.exe'
+            - '\az.exe'
+            - '\gsutil.exe'
+    selection_utilities_original:
+        OriginalFileName:
+            - 'rclone.exe'
+            - 'mega-cmd.exe'
+            - 'mega.exe'
+            - 'MegaSync.exe'
+            - 'aws.exe'
+            - 'az.exe'
+            - 'gsutil.py'
+    selection_sync_commands:
+        CommandLine|contains:
+            - ' sync '
+            - ' copy '
+            - ' upload '
+            - ' s3 cp '
+            - ' blob upload '
+    condition: (selection_utilities_image or selection_utilities_original) and selection_sync_commands
+fields:
+    - Image
+    - OriginalFileName
+    - CommandLine
+    - ParentImage
+    - ParentCommandLine
+    - CurrentDirectory
+    - User
+    - LogonId
+falsepositives:
+    - IT administrators using rclone or cloud CLIs to manage system backups or sync server repositories to enterprise cloud storage.
+level: high
+tags:
+    - attack.exfiltration
+    - attack.t1567.002
+    - analytic.an1571
+    - detection.det0570
+---
+
+title: Stopping or Disabling Critical System Services via CLI (AN0061-A)
+id: 722a6497-d19a-4de1-b0df-93c820959c26
+status: experimental
+description: Detects command-line execution of sc.exe, net.exe, or net1.exe stopping or disabling critical system services (e.g. anti-virus, firewalls, databases).
+author: Krishna Gupta
+date: 2026-06-07
+logsource:
+    category: process_creation
+    product: windows
+detection:
+    selection_tools:
+        - Image|endswith:
+            - '\sc.exe'
+            - '\net.exe'
+            - '\net1.exe'
+        - OriginalFileName:
+            - 'sc.exe'
+            - 'net.exe'
+            - 'net1.exe'
+    selection_action:
+        CommandLine|contains:
+            - 'stop'
+            - 'config'
+    selection_services:
+        CommandLine|contains:
+            - 'WinDefend'
+            - 'MpsSvc'
+            - 'Sentinel'
+            - 'Wazuh'
+            - 'Sysmon'
+            - 'CarbonBlack'
+            - 'CrowdStrike'
+            - 'Sophos'
+            - 'MSExchange'
+            - 'MSSQL'
+            - 'disable'
+    filter_installer:
+        ParentImage|endswith:
+            - '\msiexec.exe'
+            - '\setup.exe'
+    condition: selection_tools and selection_action and selection_services and not filter_installer
+fields:
+    - Image
+    - OriginalFileName
+    - CommandLine
+    - ParentImage
+    - ParentCommandLine
+    - CurrentDirectory
+    - User
+    - LogonId
+falsepositives:
+    - IT administration tasks during database upgrades, security agent updates, or system troubleshooting.
+level: high
+tags:
+    - attack.impact
+    - attack.t1489
+    - analytic.an0061
+    - detection.det0021
+---
+
+title: Execution of Bandwidth Hijacking or Proxyjacking Software via CLI (AN0080-A)
+id: 1bcb7ce1-0c4f-43ac-b7a1-4a42df24d159
+status: experimental
+description: Detects command-line execution of known proxyjacking, bandwidth sharing, or botnet scanning software, which is used for bandwidth hijacking and resource abuse.
+author: Krishna Gupta
+date: 2026-06-07
+logsource:
+    category: process_creation
+    product: windows
+detection:
+    selection_rmm:
+        - Image|endswith:
+            - '\honeygain.exe'
+            - '\packetstream.exe'
+            - '\peer2profit.exe'
+            - '\earnapp.exe'
+            - '\iproyal.exe'
+            - '\masscan.exe'
+        - OriginalFileName:
+            - 'honeygain.exe'
+            - 'packetstream.exe'
+            - 'peer2profit.exe'
+            - 'earnapp.exe'
+            - 'iproyal.exe'
+            - 'masscan.exe'
+    filter_installer:
+        ParentImage|endswith:
+            - '\msiexec.exe'
+            - '\setup.exe'
+    condition: selection_rmm and not filter_installer
+fields:
+    - Image
+    - OriginalFileName
+    - CommandLine
+    - ParentImage
+    - ParentCommandLine
+    - CurrentDirectory
+    - User
+    - LogonId
+falsepositives:
+    - Highly unlikely in enterprise environments. Standard employees should not be running bandwidth-sharing applications.
+level: high
+tags:
+    - attack.impact
+    - attack.t1496.002
+    - analytic.an0080
+    - detection.det0028
+---
+
+title: Database or Log File Modification by Non-Database Process via File Event (AN0162-A)
+id: 29788bad-55f0-4ac0-b4ad-f6acbec0f5d4
+status: experimental
+description: Detects command-line interpreters or scripting hosts modifying or creating database files (e.g., .db, .sqlite, .mdf) or system log files (.evtx), which can indicate unauthorized data manipulation or log tempering.
+author: Krishna Gupta
+date: 2026-06-07
+logsource:
+    category: file_event
+    product: windows
+detection:
+    selection_process:
+        Image|endswith:
+            - '\powershell.exe'
+            - '\pwsh.exe'
+            - '\cmd.exe'
+            - '\wscript.exe'
+            - '\cscript.exe'
+            - '\mshta.exe'
+    selection_files:
+        TargetFilename|endswith:
+            - '.db'
+            - '.sqlite'
+            - '.sqlite3'
+            - '.mdf'
+            - '.ldf'
+            - '.mdb'
+            - '.accdb'
+            - '.evtx'
+    condition: selection_process and selection_files
+fields:
+    - Image
+    - TargetFilename
+falsepositives:
+    - Legitimate administration scripts managing local SQLite databases or backing up event log files (.evtx).
+level: medium
+tags:
+    - attack.impact
+    - attack.t1565
+    - analytic.an0162
+    - detection.det0162
+---
+
+title: Registry Modification for System Logon Defacement via Registry Set (AN0229-A)
+id: e0af0b06-fd32-4877-a76a-aeb2f157af50
+status: experimental
+description: Detects registry modifications targeting Windows logon legal notice banners or wallpaper registry values, which can indicate system defacement.
+author: Krishna Gupta
+date: 2026-06-07
+logsource:
+    category: registry_set
+    product: windows
+detection:
+    selection_target:
+        TargetObject|contains:
+            - '\Policies\System\legalnoticecaption'
+            - '\Policies\System\legalnoticetext'
+            - '\Control Panel\Desktop\wallpaper'
+    condition: selection_target
+fields:
+    - TargetObject
+    - Image
+    - User
+falsepositives:
+    - IT administration deploying corporate warning banners or setting default company wallpapers.
+level: medium
+tags:
+    - attack.impact
+    - attack.t1491.001
+    - analytic.an0229
+    - detection.det0082
+---
+
+title: User Account Access Removal via CLI (AN0334-A)
+id: b847b99b-3d9d-4945-85df-08951cf3bca0
+status: experimental
+description: Detects command-line execution of net.exe or net1.exe used to delete, disable, or deactivate user accounts, which can be abused to lock out administrators.
+author: Krishna Gupta
+date: 2026-06-07
+logsource:
+    category: process_creation
+    product: windows
+detection:
+    selection_net:
+        - Image|endswith:
+            - '\net.exe'
+            - '\net1.exe'
+        - OriginalFileName:
+            - 'net.exe'
+            - 'net1.exe'
+    selection_net_user:
+        CommandLine|contains:
+            - 'user'
+    selection_net_action:
+        CommandLine|contains:
+            - '/delete'
+            - 'active:no'
+            - '/active:no'
+    filter_installer:
+        ParentImage|endswith:
+            - '\msiexec.exe'
+            - '\setup.exe'
+    condition: selection_net and selection_net_user and selection_net_action and not filter_installer
+fields:
+    - Image
+    - OriginalFileName
+    - CommandLine
+    - ParentImage
+    - ParentCommandLine
+    - CurrentDirectory
+    - User
+    - LogonId
+falsepositives:
+    - Legitimate administrative account management tasks or automated user lifecycle provisioning scripts disabling inactive accounts.
+level: high
+tags:
+    - attack.impact
+    - attack.t1531
+    - analytic.an0334
+    - detection.det0334
+---
+
+title: Boot Configuration Tampering via CLI (AN0474-A)
+id: 71cf4f2b-adb2-4c0d-bbf7-cce1ad4cb002
+status: experimental
+description: Detects command-line modifications using bcdedit.exe to disable boot recovery options, disable safe boot configurations, or set anomalous boot configurations, which is typical of destructive ransomware and system disruption.
+author: Krishna Gupta
+date: 2026-06-07
+logsource:
+    category: process_creation
+    product: windows
+detection:
+    selection_bcdedit:
+        - Image|endswith: '\bcdedit.exe'
+        - OriginalFileName: 'bcdedit.exe'
+    selection_bcdedit_cmds:
+        CommandLine|contains:
+            - '/set'
+            - '/deletevalue'
+    selection_bcdedit_targets:
+        CommandLine|contains:
+            - 'recoveryenabled'
+            - 'bootstatuspolicy'
+            - 'ignoreallfailures'
+            - 'safeboot'
+    filter_installer:
+        ParentImage|endswith:
+            - '\msiexec.exe'
+            - '\setup.exe'
+    condition: selection_bcdedit and selection_bcdedit_cmds and selection_bcdedit_targets and not filter_installer
+fields:
+    - Image
+    - OriginalFileName
+    - CommandLine
+    - ParentImage
+    - ParentCommandLine
+    - CurrentDirectory
+    - User
+    - LogonId
+falsepositives:
+    - IT administrators configuring boot options during OS installation or system maintenance.
+level: high
+tags:
+    - attack.impact
+    - attack.t1495
+    - analytic.an0474
+    - detection.det0167
+---
+
+title: Potential Endpoint Service Exhaustion Flood Tool Execution via CLI (AN0489-A)
+id: 2f6910a0-887d-48d7-8c2a-2be4d8c5b6e6
+status: experimental
+description: Detects the execution of known load testing or HTTP flooding utilities (like ab.exe or slowhttptest) or scripting engines running parameters indicative of a service exhaustion flood.
+author: Krishna Gupta
+date: 2026-06-07
+logsource:
+    category: process_creation
+    product: windows
+detection:
+    selection_tools:
+        - Image|endswith:
+            - '\ab.exe'
+            - '\slowhttptest.exe'
+            - '\hping3.exe'
+        - OriginalFileName:
+            - 'ab.exe'
+            - 'slowhttptest.exe'
+            - 'hping3.exe'
+    selection_scripts:
+        Image|endswith:
+            - '\powershell.exe'
+            - '\pwsh.exe'
+            - '\cmd.exe'
+    selection_script_loop:
+        CommandLine|contains:
+            - 'while($true)'
+            - 'while(1)'
+            - 'for /l'
+    selection_script_cmd:
+        CommandLine|contains:
+            - 'Invoke-WebRequest'
+            - 'Invoke-RestMethod'
+            - 'curl'
+            - 'wget'
+    filter_installer:
+        ParentImage|endswith:
+            - '\msiexec.exe'
+            - '\setup.exe'
+    condition: (selection_tools or (selection_scripts and selection_script_loop and selection_script_cmd)) and not filter_installer
+fields:
+    - Image
+    - OriginalFileName
+    - CommandLine
+    - ParentImage
+    - ParentCommandLine
+    - CurrentDirectory
+    - User
+    - LogonId
+falsepositives:
+    - Authorized application load testing conducted by QA teams or web developers within testing subnets.
+level: medium
+tags:
+    - attack.impact
+    - attack.t1499.002
+    - analytic.an0489
+    - detection.det0173
+---
+
+title: Stored Office Document Modification by Scripting Host via File Event (AN0555-A)
+id: 8c37fbed-f503-4601-a28b-4997974eefc5
+status: experimental
+description: Detects command-line interpreters or scripting hosts creating or modifying business-critical office documents (e.g. .docx, .xlsx, .pdf), which can indicate unauthorized stored data manipulation.
+author: Krishna Gupta
+date: 2026-06-07
+logsource:
+    category: file_event
+    product: windows
+detection:
+    selection_process:
+        Image|endswith:
+            - '\powershell.exe'
+            - '\pwsh.exe'
+            - '\cmd.exe'
+            - '\wscript.exe'
+            - '\cscript.exe'
+            - '\mshta.exe'
+    selection_files:
+        TargetFilename|endswith:
+            - '.docx'
+            - '.xlsx'
+            - '.pptx'
+            - '.pdf'
+            - '.odt'
+            - '.ods'
+    condition: selection_process and selection_files
+fields:
+    - Image
+    - TargetFilename
+falsepositives:
+    - Legitimate enterprise automation scripts performing automated report compilation, PDF generation, or document migration.
+level: medium
+tags:
+    - attack.impact
+    - attack.t1565.001
+    - analytic.an0555
+    - detection.det0555
+---
+
+title: Endpoint CPU or Memory Stressing Execution (AN0584-A)
+id: de0ccb22-bf47-436a-a411-8252e73ea026
+status: experimental
+description: Detects command-line execution of stress-testing tools or scripts designed to exhaust system CPU or memory resources on endpoints.
+author: Krishna Gupta
+date: 2026-06-30
+logsource:
+    category: process_creation
+    product: windows
+detection:
+    selection_images:
+        Image|endswith:
+            - '\cpustres.exe'
+            - '\heavyload.exe'
+            - '\stressapptest.exe'
+            - '\prime95.exe'
+            - '\cinebench.exe'
+            - '\memtest.exe'
+        OriginalFileName:
+            - 'cpustres.exe'
+            - 'heavyload.exe'
+            - 'stressapptest.exe'
+            - 'prime95.exe'
+            - 'cinebench.exe'
+            - 'memtest.exe'
+    selection_cli:
+        CommandLine|contains:
+            - 'consume-cpu'
+            - 'consume-mem'
+            - 'stress-ng'
+            - '--cpu-load'
+            - 'burn-in'
+    filter_admin:
+        User: 'NT AUTHORITY\SYSTEM'
+    filter_installers:
+        ParentImage|endswith:
+            - '\msiexec.exe'
+            - '\setup.exe'
+    condition: (selection_images or selection_cli) and not (filter_installers or filter_admin)
+fields:
+    - Image
+    - OriginalFileName
+    - CommandLine
+    - ParentImage
+    - User
+falsepositives:
+    - Performance benchmarks conducted by IT administrators, hardware diagnostics, or developers testing application resource management.
+level: medium
+tags:
+    - attack.impact
+    - attack.t1499
+    - analytic.an0584
+    - detection.det0208
+---
+
+title: Ransom Note File Drop (AN0602-A)
+id: e0b3e0ce-3b5b-4859-b905-421f302d558a
+status: experimental
+description: Detects the drop of ransomware ransom instructions or help files.
+author: Krishna Gupta
+date: 2026-06-30
+logsource:
+    category: file_event
+    product: windows
+detection:
+    selection_notes:
+        TargetFilename|endswith:
+            - '\README_TO_DECRYPT.txt'
+            - '\DECRYPT_INSTRUCTIONS.html'
+            - '\HOW_TO_DECRYPT.txt'
+            - '\HELP_DECRYPT.txt'
+            - '\RESTORE_FILES.txt'
+    filter_sys:
+        Image|endswith:
+            - '\msiexec.exe'
+            - '\tiworker.exe'
+            - '\setup.exe'
+            - '\update.exe'
+    condition: selection_notes and not filter_sys
+fields:
+    - TargetFilename
+    - Image
+    - User
+falsepositives:
+    - Administrative scripts or tests dropping help files in sandbox systems.
+level: high
+tags:
+    - attack.impact
+    - attack.t1486
+    - analytic.an0602
+    - detection.det0215
+---
+
+title: Static Web Page Modification by Non-Webserver Process (AN0662-A)
+id: c92c08f0-855a-4ec9-befc-f49a156c572e
+status: experimental
+description: Detects modifications of HTML/JS/CSS files in standard web roots by processes other than IIS, Apache, Nginx, or administrative editors.
+author: Krishna Gupta
+date: 2026-06-30
+logsource:
+    category: file_event
+    product: windows
+detection:
+    selection_web_paths:
+        TargetFilename|contains:
+            - '\inetpub\wwwroot\'
+            - '\apache\htdocs\'
+            - '\nginx\html\'
+            - '\tomcat\webapps\'
+    selection_extensions:
+        TargetFilename|endswith:
+            - '.html'
+            - '.htm'
+            - '.js'
+            - '.css'
+    filter_webservers:
+        Image|endswith:
+            - '\w3wp.exe'
+            - '\httpd.exe'
+            - '\nginx.exe'
+            - '\tomcat.exe'
+            - '\msdeploy.exe'
+    filter_editors:
+        Image|endswith:
+            - '\notepad.exe'
+            - '\code.exe'
+            - '\explorer.exe'
+    filter_deployment:
+        ParentImage|endswith:
+            - '\msdeploy.exe'
+            - '\git.exe'
+            - '\svn.exe'
+    condition: selection_web_paths and selection_extensions and not (filter_webservers or filter_editors or filter_deployment)
+fields:
+    - TargetFilename
+    - Image
+    - User
+falsepositives:
+    - Internal deployment tools or custom scripting frameworks updating web assets legitimately.
+level: medium
+tags:
+    - attack.impact
+    - attack.t1491
+    - analytic.an0662
+    - detection.det0238
+---
+
+title: MitM and Redirection Tool Execution (AN0702-A)
+id: 554af310-0634-4277-9d95-3526709e1687
+status: experimental
+description: Detects command-line execution of man-in-the-middle, ARP spoofing, or packet redirect tools.
+author: Krishna Gupta
+date: 2026-06-30
+logsource:
+    category: process_creation
+    product: windows
+detection:
+    selection_images:
+        Image|endswith:
+            - '\ettercap.exe'
+            - '\bettercap.exe'
+            - '\mitmproxy.exe'
+            - '\mitmdump.exe'
+            - '\cain.exe'
+            - '\arpspoof.exe'
+        OriginalFileName:
+            - 'ettercap.exe'
+            - 'bettercap.exe'
+            - 'mitmproxy.exe'
+            - 'mitmdump.exe'
+            - 'cain.exe'
+            - 'arpspoof.exe'
+    selection_cli:
+        CommandLine|contains:
+            - 'ettercap -'
+            - 'bettercap -'
+            - 'mitmproxy -'
+            - 'arpspoof -'
+    filter_admin:
+        ParentImage|endswith:
+            - '\powershell.exe'
+            - '\cmd.exe'
+        User|contains:
+            # Removed loose 'network' keyword which matched 'NT AUTHORITY\NETWORK SERVICE'
+            - 'admin'
+    filter_installers:
+        ParentImage|endswith:
+            - '\msiexec.exe'
+            - '\setup.exe'
+    condition: (selection_images or selection_cli) and not (filter_installers or filter_admin)
+fields:
+    - Image
+    - OriginalFileName
+    - CommandLine
+    - User
+falsepositives:
+    - Network engineers running authorized security reviews or diagnostics.
+level: high
+tags:
+    - attack.impact
+    - attack.t1565.002
+    - analytic.an0702
+    - detection.det0254
+---
+
+title: Cryptomining Utility Process Execution (AN0741-A)
+id: 75849473-ef74-4f18-afeb-6b3e64b3709b
+status: experimental
+description: Detects command-line execution of cryptomining binaries like xmrig, cgminer, or minerd, or arguments specifying mining wallets and pools.
+author: Krishna Gupta
+date: 2026-06-30
+logsource:
+    category: process_creation
+    product: windows
+detection:
+    selection_images:
+        Image|endswith:
+            - '\xmrig.exe'
+            - '\minerd.exe'
+            - '\cgminer.exe'
+            - '\ccminer.exe'
+            - '\nicehash.exe'
+        OriginalFileName:
+            - 'xmrig.exe'
+            - 'minerd.exe'
+            - 'cgminer.exe'
+            - 'ccminer.exe'
+            - 'nicehash.exe'
+    selection_cli:
+        CommandLine|contains:
+            - 'stratum+tcp://'
+            - 'stratum+ssl://'
+            - '--stratum'
+            - 'stratum+udp'
+            - '--nicehash'
+            - '--algo rx/'
+            - '--donate-level='
+    filter_installers:
+        ParentImage|endswith:
+            - '\msiexec.exe'
+            - '\setup.exe'
+    condition: (selection_images or selection_cli) and not filter_installers
+fields:
+    - Image
+    - OriginalFileName
+    - CommandLine
+    - User
+falsepositives:
+    - Authorized distributed computing projects or sandboxed test mining configurations.
+level: high
+tags:
+    - attack.impact
+    - attack.t1496
+    - analytic.an0741
+    - detection.det0267
+---
+
+title: SCM Event Log Service Crash Loop (AN0850-A)
+id: 7ed7934c-3488-4050-b229-00a9110ba734
+status: experimental
+description: Detects Service Control Manager Event ID 7031 logs showing service crashes leading to configured recovery actions. This rule should be aggregated in the SIEM layer to count loop patterns.
+author: Krishna Gupta
+date: 2026-06-30
+logsource:
+    product: windows
+    service: system
+detection:
+    selection_scm:
+        EventID: 7031
+    selection_services:
+        Description|contains:
+            - 'Local Security Authority'
+            - 'Windows Defender'
+            - 'Sysmon'
+            - 'Wazuh'
+            - 'Exchange'
+            - 'IISAdmin'
+            - 'MSSQL'
+    condition: selection_scm and selection_services
+fields:
+    - EventID
+    - Description
+    - Source
+falsepositives:
+    - Failing system updates, memory leaks in legacy applications, or hardware failure leading to application instability.
+level: medium
+tags:
+    - attack.impact
+    - attack.t1499.004
+    - analytic.an0850
+    - detection.det0304
+---
+
+title: Backup Catalog and Shadow Copy Deletion (AN0933-A)
+id: fad9b954-adb3-4875-812b-08b0652e57ef
+status: experimental
+description: Detects command-line execution of vssadmin, wbadmin, bcdedit, wmic, diskshadow, or REAgentC attempting to delete shadow copies or catalog files.
+author: Krishna Gupta
+date: 2026-06-30
+logsource:
+    category: process_creation
+    product: windows
+detection:
+    selection_images:
+        Image|endswith:
+            - '\vssadmin.exe'
+            - '\wbadmin.exe'
+            - '\bcdedit.exe'
+            - '\wmic.exe'
+            - '\diskshadow.exe'
+            - '\reagentc.exe'
+        OriginalFileName:
+            - 'vssadmin.exe'
+            - 'wbadmin.exe'
+            - 'bcdedit.exe'
+            - 'wmic.exe'
+            - 'diskshadow.exe'
+            - 'reagentc.exe'
+    selection_args:
+        CommandLine|contains:
+            - 'delete shadows'
+            - 'delete catalog'
+            - 'delete systemstatebackup'
+            - 'shadowcopy delete'
+            - 'recoveryenabled no'
+            - 'ignoreallfailures'
+            - '/disable'
+    filter_legitimate:
+        # Exclude legitimate backup managers by parent image across any user context to avoid AND logic gaps
+        ParentImage|endswith:
+            - '\svchost.exe'
+            - '\backup.exe'
+            - '\veeam.exe'
+    condition: selection_images and selection_args and not filter_legitimate
+fields:
+    - Image
+    - OriginalFileName
+    - CommandLine
+    - User
+falsepositives:
+    - Standard automated backup scripts or disaster recovery routines running under system privileges.
+level: critical
+tags:
+    - attack.impact
+    - attack.t1490
+    - analytic.an0933
+    - detection.det0329
+---
+
+title: Network Flooding Tools Execution (AN0969-A)
+id: 2c06c689-f35d-4bf6-998a-49b629b41869
+status: experimental
+description: Detects command-line execution of known network flooding utilities (e.g. LOIC, HOIC, hping3).
+author: Krishna Gupta
+date: 2026-06-30
+logsource:
+    category: process_creation
+    product: windows
+detection:
+    selection_images:
+        Image|endswith:
+            - '\loic.exe'
+            - '\hoic.exe'
+            - '\hping3.exe'
+            - '\nping.exe'
+            - '\ufonet.exe'
+        OriginalFileName:
+            - 'loic.exe'
+            - 'hoic.exe'
+            - 'hping3.exe'
+            - 'nping.exe'
+            - 'ufonet.exe'
+    selection_cli:
+        CommandLine|contains:
+            - 'loic'
+            - 'hoic'
+            - 'hping3'
+            - 'nping'
+            - 'synflood'
+    condition: selection_images or selection_cli
+fields:
+    - Image
+    - OriginalFileName
+    - CommandLine
+    - User
+falsepositives:
+    - Security teams conducting authorized load testing or network stress tests.
+level: high
+tags:
+    - attack.impact
+    - attack.t1498.001
+    - analytic.an0969
+    - detection.det0343
+---
+
+title: High Frequency SMTP Tool Execution (AN1008-A)
+id: 853c0014-a299-4486-a729-8456e22e287d
+status: experimental
+description: Detects command-line execution of mail tools or scripting wrappers attempting to generate high-frequency email traffic.
+author: Krishna Gupta
+date: 2026-06-30
+logsource:
+    category: process_creation
+    product: windows
+detection:
+    selection_images:
+        Image|endswith:
+            - '\swaks.exe'
+            - '\sendmail.exe'
+            - '\postfix.exe'
+            - '\blat.exe'
+            - '\mailsend.exe'
+    selection_orig:
+        OriginalFileName:
+            - 'swaks.exe'
+            - 'sendmail.exe'
+            - 'postfix.exe'
+            - 'blat.exe'
+            - 'mailsend.exe'
+    selection_cli:
+        CommandLine|contains:
+            - 'Send-MailMessage'
+            - ' -smtp '
+            - ' -mailfrom '
+            - ' -to '
+            - ' -server '
+    filter_installer:
+        ParentImage|endswith:
+            - '\msiexec.exe'
+            - '\setup.exe'
+    condition: (selection_images or selection_orig) and selection_cli and not filter_installer
+fields:
+    - Image
+    - CommandLine
+    - User
+falsepositives:
+    - Administrative notifications or monitoring alerts launched by automated scripts.
+level: medium
+tags:
+    - attack.impact
+    - attack.t1667
+    - analytic.an1008
+    - detection.det0355
+---
+
+title: Windows Resource Exhaustion Diagnosis Event (AN1012-A)
+id: 4152d1cb-bde9-472b-af9f-a77c6b056a45
+status: experimental
+description: Detects Windows Diagnostic-Performance or System Event ID 2004 logs capturing critical virtual memory exhaustion. This rule should be aggregated in the SIEM layer to count loop patterns.
+author: Krishna Gupta
+date: 2026-06-30
+logsource:
+    product: windows
+    service: system
+detection:
+    selection_exhaustion:
+        EventID: 2004
+        Source: 'Microsoft-Windows-Resource-Exhaustion-Detector'
+    condition: selection_exhaustion
+fields:
+    - EventID
+    - Description
+    - Source
+falsepositives:
+    - Heavy compilation jobs, database index rebuilds, or legitimate hypervisor processes over-allocating RAM.
+level: medium
+tags:
+    - attack.impact
+    - attack.t1499.001
+    - analytic.an1012
+    - detection.det0356
+---
+
+title: Code Injection into Transaction Applications (AN1097-A)
+id: 0b1d060d-fb90-45d0-9d76-eec5ab0629f4
+status: experimental
+description: Detects processes requesting high-privilege write access handles targeting transaction or database processes.
+author: Krishna Gupta
+date: 2026-06-30
+logsource:
+    category: process_access
+    product: windows
+detection:
+    selection_target:
+        TargetImage|endswith:
+            - '\pos.exe'
+            - '\retail.exe'
+            - '\sap.exe'
+            - '\sqlserver.exe'
+            - '\postgres.exe'
+    selection_access:
+        # Requesting write or full VM control access handles
+        GrantedAccess:
+            - '0x1F0FFF'
+            - '0x1010'
+            - '0x1410'
+    filter_sys:
+        SourceImage|endswith:
+            - '\system32\svchost.exe'
+            - '\system32\lsass.exe'
+            - '\system32\csrss.exe'
+            - '\system32\winlogon.exe'
+            - '\MsMpEng.exe'
+    condition: selection_target and selection_access and not filter_sys
+fields:
+    - SourceImage
+    - TargetImage
+    - GrantedAccess
+    - User
+falsepositives:
+    - Administrative diagnostics or application monitoring engines capturing query profiles.
+level: high
+tags:
+    - attack.impact
+    - attack.t1565.003
+    - analytic.an1097
+    - detection.det0391
+---
+
+title: Scripting Process Outbound DNS or NTP Connection Burst (AN1140-A)
+id: 10c13787-3273-4290-9c50-cac849ba5bd1
+status: experimental
+description: Detects scripting interpreters initiating connection bursts to DNS or NTP ports. Pair with SIEM-side volume aggregation.
+author: Krishna Gupta
+date: 2026-06-30
+logsource:
+    category: network_connection
+    product: windows
+detection:
+    selection_images:
+        Image|endswith:
+            - '\python.exe'
+            - '\powershell.exe'
+            - '\pwsh.exe'
+            - '\cmd.exe'
+            - '\wscript.exe'
+            - '\cscript.exe'
+    selection_ports:
+        DestinationPort:
+            - 53
+            - 123
+    filter_internal:
+        # Exclude internal servers and local resolvers
+        DestinationIp|startswith:
+            - '127.'
+            - '10.'
+            - '192.168.'
+            - '172.16.'
+    condition: selection_images and selection_ports and not filter_internal
+fields:
+    - Image
+    - DestinationIp
+    - DestinationPort
+    - User
+falsepositives:
+    - Legitimate administration scripts checking time servers or resolving APIs.
+level: medium
+tags:
+    - attack.impact
+    - attack.t1498.002
+    - analytic.an1140
+    - detection.det0408
+---
+
+title: High Connection Burst to Web Server Port (AN1165-A)
+id: 03ca01d6-59cd-4a04-8e77-b27321c61bda
+status: experimental
+description: Detects process connections targeting web ports. Pair with SIEM-side volume checks to detect flood attempts.
+author: Krishna Gupta
+date: 2026-06-30
+logsource:
+    category: network_connection
+    product: windows
+detection:
+    selection_ports:
+        DestinationPort:
+            - 80
+            - 443
+            - 8080
+            - 8443
+    filter_browsers:
+        Image|endswith:
+            - '\chrome.exe'
+            - '\firefox.exe'
+            - '\msedge.exe'
+    filter_webservers:
+        # Exclude loopbacks or proxy traffic from webservers
+        Image|endswith:
+            - '\w3wp.exe'
+            - '\nginx.exe'
+            - '\httpd.exe'
+            - '\tomcat.exe'
+    condition: selection_ports and not (filter_browsers or filter_webservers)
+fields:
+    - Image
+    - DestinationIp
+    - DestinationPort
+    - User
+falsepositives:
+    - Administrative update engines or development tools communicating with web services.
+level: low
+tags:
+    - attack.impact
+    - attack.t1499.003
+    - analytic.an1165
+    - detection.det0415
+---
+
+title: Point-of-Sale RAM Scraper Process Creation (AN1361-A)
+id: daaaa983-9ca1-4987-8e61-24be1d1075ab
+status: experimental
+description: Detects command-line execution of Point-of-Sale memory scrapers or tools scanning memory handles.
+author: Krishna Gupta
+date: 2026-06-30
+logsource:
+    category: process_creation
+    product: windows
+detection:
+    selection_images:
+        Image|endswith:
+            - '\alina.exe'
+            - '\dexter.exe'
+            - '\blackpos.exe'
+            - '\poscard.exe'
+            - '\memdump.exe'
+    selection_orig:
+        OriginalFileName:
+            - 'alina.exe'
+            - 'dexter.exe'
+            - 'blackpos.exe'
+            - 'poscard.exe'
+            - 'memdump.exe'
+    selection_cli:
+        CommandLine|contains:
+            - 'pos-scrape'
+            - 'card-grab'
+            - 'track2'
+            - 'dump-ram'
+    filter_installers:
+        ParentImage|endswith:
+            - '\msiexec.exe'
+            - '\setup.exe'
+    condition: (selection_images or selection_orig) and selection_cli and not filter_installers
+fields:
+    - Image
+    - CommandLine
+    - User
+falsepositives:
+    - Diagnostic tools or memory debuggers run by retail application support teams during maintenance.
+level: critical
+tags:
+    - attack.impact
+    - attack.t1657
+    - analytic.an1361
+    - detection.det0495
+---
+
+title: Denial of Service Script Engine Execution (AN1434-A)
+id: 50eb0b67-9e94-43a7-8e49-e5f31ae7ab6d
+status: experimental
+description: Detects command-line execution of Python, PowerShell, or Perl interpreters targeting network flooding or DoS attacks.
+author: Krishna Gupta
+date: 2026-06-30
+logsource:
+    category: process_creation
+    product: windows
+detection:
+    selection_images:
+        Image|endswith:
+            - '\python.exe'
+            - '\powershell.exe'
+            - '\pwsh.exe'
+            - '\perl.exe'
+            - '\go.exe'
+    selection_cli:
+        CommandLine|contains:
+            - 'slowloris'
+            - 'goldeneye'
+            - 'hulk.py'
+            - 'rudy.py'
+            - 'syn-flood'
+            - 'udp-flood'
+            - 'ping-of-death'
+    condition: selection_images and selection_cli
+fields:
+    - Image
+    - CommandLine
+    - User
+falsepositives:
+    - Internal network security team running approved stress tests or load capability checks.
+level: high
+tags:
+    - attack.impact
+    - attack.t1498
+    - analytic.an1434
+    - detection.det0518
+---
+
+title: Persistent Miner Service Registration (AN1489-A)
+id: a33fb320-bd6f-4897-8fb0-2a2134051f5b
+status: experimental
+description: Detects registry entries creating system services pointing to known cryptomining processes.
+author: Krishna Gupta
+date: 2026-06-30
+logsource:
+    category: registry_set
+    product: windows
+detection:
+    selection_registry:
+        TargetObject|contains:
+            - 'SYSTEM\CurrentControlSet\Services\'
+    selection_details:
+        Details|contains:
+            - '\xmrig'
+            - '\minerd'
+            - '\cgminer'
+            - '--stratum'
+            - '--pool'
+    filter_installer:
+        Image|endswith:
+            - '\msiexec.exe'
+            - '\setup.exe'
+    condition: selection_registry and selection_details and not filter_installer
+fields:
+    - TargetObject
+    - Details
+    - Image
+    - User
+falsepositives:
+    - Standard enterprise software deploying components that share parameters with mining tools (extremely rare).
+level: critical
+tags:
+    - attack.impact
+    - attack.t1496.001
+    - analytic.an1489
+    - detection.det0540
+---
+
+title: CDN or External Hosting Update Command Line (AN1622-A)
+id: 6e4f2cd2-3717-4144-a11e-c99881887fb3
+status: experimental
+description: Detects command-line arguments indicating CLI or scripting modifications targeting public CDN or cloud static assets.
+author: Krishna Gupta
+date: 2026-06-30
+logsource:
+    category: process_creation
+    product: windows
+detection:
+    selection_images:
+        Image|endswith:
+            - '\aws.exe'
+            - '\az.exe'
+            - '\python.exe'
+            - '\node.exe'
+    selection_cli:
+        CommandLine|contains:
+            - 's3 sync'
+            - 's3 cp'
+            - 'cdn profile'
+            - 'cloudflare'
+            - 'invalidate'
+            - 'defaced'
+    filter_cicd_images:
+        Image|endswith:
+            - '\gitlab-runner.exe'
+            - '\agent.exe'
+            - '\jenkins.exe'
+            - '\tcagent.exe'
+    filter_cicd_users:
+        User|contains:
+            - 'service'
+            - 'build'
+            - 'deploy'
+    filter_installers:
+        ParentImage|endswith:
+            - '\msiexec.exe'
+            - '\setup.exe'
+    condition: selection_images and selection_cli and not (filter_cicd_images or filter_cicd_users or filter_installers)
+fields:
+    - Image
+    - CommandLine
+    - User
+falsepositives:
+    - Legitimate CI/CD pipelines deploying standard corporate assets to public facing CDNs.
+level: medium
+tags:
+    - attack.impact
+    - attack.t1491.002
+    - analytic.an1622
+    - detection.det0590
+---
+
+title: Supply Chain Tampering - Suspicious Process Spawned by Development Tool via CLI (AN0021-A)
+id: f3d49213-b83e-4a74-8f41-facd8cfa4b20
+status: experimental
+description: Detects package managers or development builds (like npm, pip, nuget, maven, gradle, python, node) spawning suspicious command interpreters, script engines, or network download utilities.
+author: Krishna Gupta
+date: 2026-06-08
+logsource:
+    category: process_creation
+    product: windows
+detection:
+    selection_parent:
+        ParentImage|endswith:
+            - '\node.exe'
+            - '\npm.cmd'
+            - '\pip.exe'
+            - '\python.exe'
+            - '\python3.exe'
+            - '\nuget.exe'
+            - '\mvn.cmd'
+            - '\gradle.bat'
+            - '\msbuild.exe'
+    selection_child:
+        - Image|endswith:
+            - '\cmd.exe'
+            - '\powershell.exe'
+            - '\pwsh.exe'
+            - '\wscript.exe'
+            - '\cscript.exe'
+            - '\mshta.exe'
+            - '\curl.exe'
+            - '\certutil.exe'
+            - '\bitsadmin.exe'
+        - OriginalFileName:
+            - 'Cmd.Exe'
+            - 'PowerShell.EXE'
+            - 'wscript.exe'
+            - 'cscript.exe'
+            - 'mshta.exe'
+            - 'curl.exe'
+            - 'certutil.exe'
+            - 'bitsadmin.exe'
+    condition: selection_parent and selection_child
+fields:
+    - Image
+    - OriginalFileName
+    - CommandLine
+    - ParentImage
+    - ParentCommandLine
+    - CurrentDirectory
+    - User
+    - LogonId
+falsepositives:
+    - Legitimate post-install build scripts run by developers (e.g., compiling native C++ bindings for Node modules).
+level: medium
+tags:
+    - attack.initial-access
+    - attack.t1195.001
+    - analytic.an0021
+    - detection.det0009
+---
+
+title: Phishing - Suspicious Child Process Spawned by Mail Client (AN0188-A)
+id: b399dd2c-70dc-46d7-be33-8e0d96eb658d
+status: experimental
+description: Detects suspicious child processes spawned by Microsoft Outlook or other common email clients, which indicates potential user execution of a malicious phishing attachment.
+author: Krishna Gupta
+date: 2026-06-08
+logsource:
+    category: process_creation
+    product: windows
+detection:
+    selection_parent:
+        ParentImage|endswith:
+            - '\outlook.exe'
+            - '\thunderbird.exe'
+            - '\foxmail.exe'
+    selection_child:
+        - Image|endswith:
+            - '\cmd.exe'
+            - '\powershell.exe'
+            - '\pwsh.exe'
+            - '\wscript.exe'
+            - '\cscript.exe'
+            - '\mshta.exe'
+            - '\rundll32.exe'
+            - '\regsvr32.exe'
+            - '\hh.exe'
+            - '\bitsadmin.exe'
+            - '\curl.exe'
+        - OriginalFileName:
+            - 'Cmd.Exe'
+            - 'PowerShell.EXE'
+            - 'wscript.exe'
+            - 'cscript.exe'
+            - 'mshta.exe'
+            - 'rundll32.exe'
+            - 'regsvr32.exe'
+            - 'bitsadmin.exe'
+            - 'curl.exe'
+    condition: selection_parent and selection_child
+fields:
+    - Image
+    - OriginalFileName
+    - CommandLine
+    - ParentImage
+    - ParentCommandLine
+    - CurrentDirectory
+    - User
+    - LogonId
+falsepositives:
+    - Office extensions or administrative tools executing command scripts for mail configuration or updates.
+level: high
+tags:
+    - attack.initial-access
+    - attack.t1566
+    - analytic.an0188
+    - detection.det0070
+---
+
+title: Exploit Public-Facing Application - Suspicious Child Process of Web Server (AN0219-A)
+id: ca632cd8-675e-4d2d-bc10-0e43b2ca8cc4
+status: experimental
+description: Detects command-line interpreters or administrative utilities spawned by web server processes (e.g., IIS, Tomcat, Apache, Java web services), suggesting successful exploitation or web shell deployment.
+author: Krishna Gupta
+date: 2026-06-08
+logsource:
+    category: process_creation
+    product: windows
+detection:
+    selection_parent:
+        ParentImage|endswith:
+            - '\w3wp.exe'
+            - '\httpd.exe'
+            - '\nginx.exe'
+            - '\tomcat.exe'
+            - '\tomcat7.exe'
+            - '\tomcat8.exe'
+            - '\tomcat9.exe'
+            - '\tomcat10.exe'
+            - '\httpd.exe'
+            - '\java.exe'
+            - '\javaw.exe'
+    selection_child:
+        - Image|endswith:
+            - '\cmd.exe'
+            - '\powershell.exe'
+            - '\pwsh.exe'
+            - '\wscript.exe'
+            - '\cscript.exe'
+            - '\sh.exe'
+            - '\bash.exe'
+            - '\whoami.exe'
+            - '\net.exe'
+            - '\nltest.exe'
+            - '\systeminfo.exe'
+            - '\ipconfig.exe'
+            - '\arp.exe'
+            - '\curl.exe'
+        - OriginalFileName:
+            - 'Cmd.Exe'
+            - 'PowerShell.EXE'
+            - 'wscript.exe'
+            - 'cscript.exe'
+            - 'whoami.exe'
+            - 'net.exe'
+            - 'nltest.exe'
+            - 'systeminfo.exe'
+            - 'ipconfig.exe'
+            - 'arp.exe'
+            - 'curl.exe'
+    condition: selection_parent and selection_child
+fields:
+    - Image
+    - OriginalFileName
+    - CommandLine
+    - ParentImage
+    - ParentCommandLine
+    - CurrentDirectory
+    - User
+    - LogonId
+falsepositives:
+    - Legitimate administrative scripts triggered by web application dashboards (e.g., automated server backup scripts triggered from an admin panel).
+level: critical
+tags:
+    - attack.initial-access
+    - attack.t1190
+    - analytic.an0219
+    - detection.det0080
+---
+
+title: Spearphishing Link - Browser Spawned by Mail/Chat App with Suspicious URL (AN0298-A)
+id: 8c90670b-8813-4cdc-981d-abd3a4619890
+status: experimental
+description: Detects default web browsers spawned by email clients or collaboration apps (Outlook, Teams, Discord, Slack) containing command-line arguments that reference direct file shares (e.g., file://, UNC paths) or suspicious downloadable file extensions.
+author: Krishna Gupta
+date: 2026-06-08
+logsource:
+    category: process_creation
+    product: windows
+detection:
+    selection_parent:
+        ParentImage|endswith:
+            - '\outlook.exe'
+            - '\thunderbird.exe'
+            - '\teams.exe'
+            - '\slack.exe'
+            - '\discord.exe'
+            - '\Telegram.exe'
+    selection_browser:
+        Image|endswith:
+            - '\chrome.exe'
+            - '\msedge.exe'
+            - '\firefox.exe'
+            - '\brave.exe'
+            - '\opera.exe'
+    selection_args:
+        CommandLine|contains:
+            - 'file://'
+            - '\\\\' # UNC path
+            - '.zip'
+            - '.iso'
+            - '.img'
+            - '.lnk'
+            - '.bat'
+            - '.cmd'
+            - '.vbs'
+            - '.exe'
+            - '.scr'
+    condition: selection_parent and selection_browser and selection_args
+fields:
+    - Image
+    - OriginalFileName
+    - CommandLine
+    - ParentImage
+    - ParentCommandLine
+    - CurrentDirectory
+    - User
+    - LogonId
+falsepositives:
+    - Users clicking links in emails to download legitimate company files hosted on internal file servers or official repositories.
+level: medium
+tags:
+    - attack.initial-access
+    - attack.t1566.002
+    - analytic.an0298
+    - detection.det0107
+---
+
+title: Spearphishing via Service - Suspicious Child Process Spawned by Browser or Chat Application (AN0320-A)
+id: d116690b-6a8e-4bfb-be54-98fd6d71085b
+status: experimental
+description: Detects suspicious child processes (like cmd.exe, powershell.exe, wscript.exe, rundll32.exe) spawned by web browsers or collaboration/chat applications (Discord, Slack, Telegram, Teams), which indicates browser-initiated exploit execution or user execution of phishing attachments.
+author: Krishna Gupta
+date: 2026-06-08
+logsource:
+    category: process_creation
+    product: windows
+detection:
+    selection_parent:
+        ParentImage|endswith:
+            - '\chrome.exe'
+            - '\msedge.exe'
+            - '\firefox.exe'
+            - '\brave.exe'
+            - '\opera.exe'
+            - '\discord.exe'
+            - '\slack.exe'
+            - '\teams.exe'
+            - '\Telegram.exe'
+            - '\WhatsApp.exe'
+            - '\zoom.exe'
+    selection_child:
+        - Image|endswith:
+            - '\cmd.exe'
+            - '\powershell.exe'
+            - '\pwsh.exe'
+            - '\wscript.exe'
+            - '\cscript.exe'
+            - '\mshta.exe'
+            - '\rundll32.exe'
+            - '\regsvr32.exe'
+            - '\certutil.exe'
+            - '\bitsadmin.exe'
+            - '\curl.exe'
+            - '\scrcons.exe'
+        - OriginalFileName:
+            - 'Cmd.Exe'
+            - 'PowerShell.EXE'
+            - 'pwsh.dll'
+            - 'wscript.exe'
+            - 'cscript.exe'
+            - 'mshta.exe'
+            - 'rundll32.exe'
+            - 'regsvr32.exe'
+            - 'certutil.exe'
+            - 'bitsadmin.exe'
+            - 'curl.exe'
+    condition: selection_parent and selection_child
+fields:
+    - Image
+    - OriginalFileName
+    - CommandLine
+    - ParentImage
+    - ParentCommandLine
+    - CurrentDirectory
+    - User
+    - LogonId
+falsepositives:
+    - Legitimate user actions such as developer utilities running via local browser-based IDEs (e.g., Jupyter Notebooks or VS Code Web).
+    - Auto-update mechanisms for messaging applications that spawn command-line execution or self-update scripts.
+level: high
+tags:
+    - attack.initial-access
+    - attack.t1566.003
+    - analytic.an0320
+    - detection.det0115
+---
+
+title: Drive-by Compromise - Suspicious Child Process Spawned by Browser (AN0498-A)
+id: f253efb1-1ab2-4ab7-b28a-a1d2fda75040
+status: experimental
+description: Detects suspicious processes (e.g., cmd.exe, powershell.exe, wscript.exe, rundll32.exe, mshta.exe) spawned directly by web browser processes, which indicates browser exploitation or user opening dangerous downloaded files.
+author: Krishna Gupta
+date: 2026-06-08
+logsource:
+    category: process_creation
+    product: windows
+detection:
+    selection_parent:
+        ParentImage|endswith:
+            - '\chrome.exe'
+            - '\msedge.exe'
+            - '\firefox.exe'
+            - '\brave.exe'
+            - '\opera.exe'
+            - '\iexplore.exe'
+            - '\safari.exe'
+    selection_child:
+        - Image|endswith:
+            - '\cmd.exe'
+            - '\powershell.exe'
+            - '\pwsh.exe'
+            - '\wscript.exe'
+            - '\cscript.exe'
+            - '\mshta.exe'
+            - '\rundll32.exe'
+            - '\regsvr32.exe'
+            - '\certutil.exe'
+            - '\bitsadmin.exe'
+            - '\curl.exe'
+            - '\scrcons.exe'
+        - OriginalFileName:
+            - 'Cmd.Exe'
+            - 'PowerShell.EXE'
+            - 'wscript.exe'
+            - 'cscript.exe'
+            - 'mshta.exe'
+            - 'rundll32.exe'
+            - 'regsvr32.exe'
+            - 'certutil.exe'
+            - 'bitsadmin.exe'
+            - 'curl.exe'
+    condition: selection_parent and selection_child
+fields:
+    - Image
+    - OriginalFileName
+    - CommandLine
+    - ParentImage
+    - ParentCommandLine
+    - CurrentDirectory
+    - User
+    - LogonId
+falsepositives:
+    - Legitimate web applications running on localhost (e.g., local development servers, admin dashboards) that spawn shell windows.
+    - Automated browser-based test tools (e.g. Selenium, Puppeteer) spawning command prompts to run testing scripts.
+level: high
+tags:
+    - attack.initial-access
+    - attack.t1189
+    - analytic.an0498
+    - detection.det0176
+---
+
+title: Spearphishing Attachment - Dangerous File Written by Mail Client (AN0655-A)
+id: 6ed9f7fc-4121-4bac-9ef2-71cfc1d2fb2b
+status: experimental
+description: Detects email client processes (e.g., outlook.exe, thunderbird.exe) writing files with dangerous or executable extensions (e.g., .exe, .lnk, .vbs, .hta, .iso, .img, .bat) to the file system.
+author: Krishna Gupta
+date: 2026-06-08
+logsource:
+    category: file_event
+    product: windows
+detection:
+    selection_process:
+        Image|endswith:
+            - '\outlook.exe'
+            - '\thunderbird.exe'
+            - '\foxmail.exe'
+    selection_extensions:
+        TargetFilename|endswith:
+            - '.exe'
+            - '.lnk'
+            - '.vbs'
+            - '.vbe'
+            - '.js'
+            - '.jse'
+            - '.hta'
+            - '.iso'
+            - '.img'
+            - '.bat'
+            - '.cmd'
+            - '.scr'
+            - '.wsf'
+            - '.chm'
+    condition: selection_process and selection_extensions
+fields:
+    - Image
+    - TargetFilename
+    - User
+    - LogonId
+falsepositives:
+    - Users saving legitimate business files or software installers received via corporate emails.
+level: high
+tags:
+    - attack.initial-access
+    - attack.t1566.001
+    - analytic.an0655
+    - detection.det0236
+---
+
+title: Removable Media - Execution of Script or Command from Removable Drive (AN0841-A)
+id: f1b3d968-7556-4326-ba74-f97982f00b30
+status: experimental
+description: Detects command-line interpreters, script hosts, or remote utilities executing directly from non-system drive letters (e.g., D:\, E:\, F:\, G:\, H:\), which may indicate replication from removable USB devices.
+author: Krishna Gupta
+date: 2026-06-08
+logsource:
+    category: process_creation
+    product: windows
+detection:
+    selection_drives:
+        - Image|startswith:
+            - 'D:\'
+            - 'E:\'
+            - 'F:\'
+            - 'G:\'
+            - 'H:\'
+            - 'I:\'
+        - CommandLine|contains:
+            - 'D:\'
+            - 'E:\'
+            - 'F:\'
+            - 'G:\'
+            - 'H:\'
+            - 'I:\'
+    selection_executables:
+        - Image|endswith:
+            - '\cmd.exe'
+            - '\powershell.exe'
+            - '\pwsh.exe'
+            - '\wscript.exe'
+            - '\cscript.exe'
+            - '\mshta.exe'
+            - '\rundll32.exe'
+            - '\regsvr32.exe'
+            - '\curl.exe'
+        - OriginalFileName:
+            - 'Cmd.Exe'
+            - 'PowerShell.EXE'
+            - 'wscript.exe'
+            - 'cscript.exe'
+            - 'mshta.exe'
+            - 'rundll32.exe'
+            - 'regsvr32.exe'
+    condition: selection_drives and selection_executables
+fields:
+    - Image
+    - OriginalFileName
+    - CommandLine
+    - ParentImage
+    - ParentCommandLine
+    - CurrentDirectory
+    - User
+    - LogonId
+falsepositives:
+    - Users running legitimate backup scripts, developers testing code from secondary local SSD drives (mapped as D:\ or E:\), or software installs from CD/DVD optical drives.
+level: high
+tags:
+    - attack.initial-access
+    - attack.t1091
+    - analytic.an0841
+    - detection.det0301
+---
+
+title: Software Supply Chain - Installer Spawning Suspicious Child Process (AN0862-A)
+id: 9cebec66-3b0a-48be-a60c-08885491a04b
+status: experimental
+description: Detects software installer or updater processes (like msiexec, setup, install, update) spawning command-line interpreters or networking tools, which could indicate a compromised software supply chain.
+author: Krishna Gupta
+date: 2026-06-08
+logsource:
+    category: process_creation
+    product: windows
+detection:
+    selection_parent:
+        ParentImage|endswith:
+            - '\msiexec.exe'
+            - '\setup.exe'
+            - '\install.exe'
+            - '\update.exe'
+            - '\updater.exe'
+    selection_child:
+        - Image|endswith:
+            - '\cmd.exe'
+            - '\powershell.exe'
+            - '\pwsh.exe'
+            - '\wscript.exe'
+            - '\cscript.exe'
+            - '\mshta.exe'
+            - '\curl.exe'
+            - '\certutil.exe'
+            - '\bitsadmin.exe'
+        - OriginalFileName:
+            - 'Cmd.Exe'
+            - 'PowerShell.EXE'
+            - 'wscript.exe'
+            - 'cscript.exe'
+            - 'mshta.exe'
+            - 'curl.exe'
+            - 'certutil.exe'
+            - 'bitsadmin.exe'
+    condition: selection_parent and selection_child
+fields:
+    - Image
+    - OriginalFileName
+    - CommandLine
+    - ParentImage
+    - ParentCommandLine
+    - CurrentDirectory
+    - User
+    - LogonId
+falsepositives:
+    - Legitimate software installers running configuration shell commands, register DLL actions, or post-install cleanup batch files.
+level: medium
+tags:
+    - attack.initial-access
+    - attack.t1195.002
+    - analytic.an0862
+    - detection.det0309
+---
+
+title: Content Injection - Unauthorized Process Writing Web Content (AN0992-A)
+id: 713a797e-db75-41e2-be9a-b67eaa2d8b88
+status: experimental
+description: Detects command-line interpreters or scripting hosts modifying or creating files within local web server roots (e.g., C:\inetpub\wwwroot, C:\xampp\htdocs), indicating potential content injection or defacement.
+author: Krishna Gupta
+date: 2026-06-08
+logsource:
+    category: file_event
+    product: windows
+detection:
+    selection_path:
+        TargetFilename|contains:
+            - '\inetpub\wwwroot\'
+            - '\xampp\htdocs\'
+            - '\apache\htdocs\'
+            - '\nginx\html\'
+    selection_extension:
+        TargetFilename|endswith:
+            - '.html'
+            - '.htm'
+            - '.js'
+            - '.aspx'
+            - '.asp'
+            - '.php'
+            - '.jsp'
+    selection_process:
+        Image|endswith:
+            - '\cmd.exe'
+            - '\powershell.exe'
+            - '\pwsh.exe'
+            - '\wscript.exe'
+            - '\cscript.exe'
+            - '\mshta.exe'
+            - '\curl.exe'
+    condition: selection_path and selection_extension and selection_process
+fields:
+    - Image
+    - TargetFilename
+    - User
+    - LogonId
+falsepositives:
+    - Legitimate administrative deployments or manual updates of web assets by admins using command shell scripts.
+level: high
+tags:
+    - attack.initial-access
+    - attack.t1659
+    - analytic.an0992
+    - detection.det0349
+---
+
+title: External Remote Services - Suspicious Command Execution Post-Remote Logon (AN1004-A)
+id: 76838b34-dc68-4f86-8810-4bf19b5e9f9e
+status: experimental
+description: Detects the execution of system discovery or network configuration commands shortly after a successful RDP (Logon Type 10) or Network (Logon Type 3) logon event, indicating post-intrusion reconnaissance.
+author: Krishna Gupta
+date: 2026-06-08
+logsource:
+    category: process_creation
+    product: windows
+detection:
+    selection_logon_context:
+        LogonId|not: '0x3e7' # Exclude SYSTEM session
+    selection_commands:
+        - Image|endswith:
+            - '\whoami.exe'
+            - '\net.exe'
+            - '\net1.exe'
+            - '\ipconfig.exe'
+            - '\nltest.exe'
+            - '\systeminfo.exe'
+            - '\quser.exe'
+            - '\query.exe'
+            - '\qwinsta.exe'
+        - OriginalFileName:
+            - 'whoami.exe'
+            - 'net.exe'
+            - 'net1.exe'
+            - 'ipconfig.exe'
+            - 'nltest.exe'
+            - 'systeminfo.exe'
+    condition: selection_logon_context and selection_commands
+fields:
+    - Image
+    - OriginalFileName
+    - CommandLine
+    - ParentImage
+    - ParentCommandLine
+    - CurrentDirectory
+    - User
+    - LogonId
+falsepositives:
+    - IT administrators logging in remotely to troubleshoot system issues or gather host configuration metrics.
+level: high
+tags:
+    - attack.initial-access
+    - attack.t1133
+    - analytic.an1004
+    - detection.det0354
+---
+
+title: Hardware Supply Chain - Firmware Flashing Tool Execution (AN1035-A)
+id: 1d8aa070-3a64-487c-a6c1-9b377c07e817
+status: experimental
+description: Detects the execution of known firmware/BIOS flashing tools, which may indicate unauthorized BIOS/firmware modification.
+author: Antigravity
+date: 2026-06-12
+logsource:
+    category: process_creation
+    product: windows
+detection:
+    selection_process:
+        Image|endswith:
+            - '\flashrom.exe'
+            - '\fwupd.exe'
+            - '\afuwingu.exe' # AMI Firmware Update Utility
+            - '\HpbiosUpdate.exe'
+            - '\DellBiosProvider.exe'
+            - '\WinFlash.exe'
+    condition: selection_process
+fields:
+    - Image
+    - OriginalFileName
+    - CommandLine
+    - ParentImage
+    - ParentCommandLine
+    - CurrentDirectory
+    - User
+    - LogonId
+falsepositives:
+    - Authorized IT firmware upgrades or hardware maintenance tasks by technicians.
+level: high
+tags:
+    - attack.initial-access
+    - attack.t1195.003
+    - analytic.an1035
+    - detection.det0368
+---
+
+title: Trusted Relationship Abuse - Anomalous Third-Party Administrative Logon (AN1344)
+id: ce263bca-b238-460f-9f85-2e74b9989cea
+status: experimental
+description: Detects successful authentication events by service provider (MSP) or third-party vendor accounts from non-standard source IP addresses or outside baseline administrative windows.
+author: Krishna Gupta
+date: 2026-06-08
+logsource:
+    product: windows
+    service: security
+detection:
+    selection_logon:
+        EventID: 4624
+        LogonType:
+            - 3  # Network logon (e.g., remote administration, API)
+            - 10 # RDP logon
+    selection_accounts:
+        - TargetUserName|contains:
+            - 'vendor_'
+            - 'msp_'
+            - 'admin_'
+            - 'support_'
+        - TargetDomainName|contains:
+            - 'partner'
+            - 'vendor'
+            - 'service'
+    filter_internal:
+ # Exclude standard internal subnets if necessary (tune as per business baselines)
+        IpAddress:
+            - '127.0.0.1'
+            - '::1'
+    condition: selection_logon and selection_accounts and not filter_internal
+fields:
+    - EventID
+    - IpAddress
+    - LogonType
+    - TargetDomainName
+    - TargetUserName
+falsepositives:
+    - Legitimate remote administrative support by MSPs or external consultants.
+level: high
+tags:
+    - attack.initial-access
+    - attack.t1199
+    - analytic.an1344
+    - detection.det0488
+---
+
+title: Wi-Fi Network Anomalies - Wireless Profile Query (AN1476-A)
+id: fd7ed664-2d10-4768-9c6f-fcb5364aca80
+status: experimental
+description: Detects processes executing wireless profile queries or WLAN auto-config events logging successful connection to unsecured (open) networks.
+author: Antigravity
+date: 2026-06-12
+logsource:
+    category: process_creation
+    product: windows
+detection:
+    selection_process:
+        Image|endswith:
+            - '\netsh.exe'
+        CommandLine|contains:
+            - 'wlan'
+            - 'show profiles'
+            - 'show networks'
+            - 'export profile'
+    condition: selection_process
+fields:
+    - Image
+    - OriginalFileName
+    - CommandLine
+    - ParentImage
+    - ParentCommandLine
+    - CurrentDirectory
+    - User
+    - LogonId
+falsepositives:
+    - Legitimate administrator troubleshooting network connectivity.
+level: medium
+tags:
+    - attack.initial-access
+    - attack.t1669
+    - analytic.an1476
+    - detection.det0536
+---
+
+title: Supply Chain Compromise - Installer Executing Anomalous Shell (AN1480-A)
+id: 9436a177-3531-4f61-a180-a6823905a622
+status: experimental
+description: Detects software installers or newly installed application binaries spawning command interpreters, script execution engines, or background shell commands.
+author: Krishna Gupta
+date: 2026-06-08
+logsource:
+    category: process_creation
+    product: windows
+detection:
+    selection_installer:
+        ParentImage|contains:
+            - '\Temp\'
+            - '\AppData\Local\'
+            - '\msiexec.exe'
+            - '\setup.exe'
+            - '\install.exe'
+    selection_child:
+        - Image|endswith:
+            - '\cmd.exe'
+            - '\powershell.exe'
+            - '\pwsh.exe'
+            - '\wscript.exe'
+            - '\cscript.exe'
+            - '\mshta.exe'
+            - '\curl.exe'
+            - '\certutil.exe'
+        - OriginalFileName:
+            - 'Cmd.Exe'
+            - 'PowerShell.EXE'
+            - 'wscript.exe'
+            - 'cscript.exe'
+            - 'mshta.exe'
+            - 'curl.exe'
+            - 'certutil.exe'
+    condition: selection_installer and selection_child
+fields:
+    - Image
+    - OriginalFileName
+    - CommandLine
+    - ParentImage
+    - ParentCommandLine
+    - CurrentDirectory
+    - User
+    - LogonId
+falsepositives:
+    - Legitimate software setup wrappers unpacking and running setup scripts.
+level: medium
+tags:
+    - attack.initial-access
+    - attack.t1195
+    - analytic.an1480
+    - detection.det0537
